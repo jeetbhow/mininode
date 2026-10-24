@@ -1,0 +1,6 @@
+/build/
+
+# Meson wrap downloads (keep the .wrap files)
+/subprojects/packagecache/
+/subprojects/googletest-*/
+/subprojects/.wraplock
