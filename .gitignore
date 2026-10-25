@@ -1,4 +1,5 @@
 /build/
+/docs
 
 # Meson wrap downloads (keep the .wrap files)
 /subprojects/packagecache/
