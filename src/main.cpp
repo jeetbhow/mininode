@@ -1,8 +1,8 @@
 #include <iostream>
 
-#include <http/version.hpp>
+#include <http/http.hpp>
 
 int main() {
-    std::cout << "Hello from http " << http::version() << "!\n";
+    std::cout << "Hello, world!\n";
     return 0;
 }

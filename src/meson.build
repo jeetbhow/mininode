@@ -1,5 +1,5 @@
 lib_sources = files(
-    'version.cpp'
+    'http.cpp'
 )
 
 http_lib = static_library(
