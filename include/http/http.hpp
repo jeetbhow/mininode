@@ -72,7 +72,7 @@ namespace http {
          * @brief Looks up the value of a header field. Same as `get()`.
          *
          * Read-only: unlike `std::map::operator[]`, this never inserts a
-         * field. Use `put()` to add one.
+         * field. Use `add()` to insert one.
          *
          * @param name The field name, e.g. "Content-Type".
          * @return The field's value, or `std::nullopt` if no field has that name.
@@ -101,7 +101,7 @@ namespace http {
          * @param name  The field name.
          * @param value The field value.
          */
-        void put(std::string name, std::string value);
+        void add(std::string name, std::string value);
 
         /**
          * @brief Removes every header field with the given name.

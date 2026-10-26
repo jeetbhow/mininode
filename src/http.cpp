@@ -18,22 +18,54 @@
 using namespace std;
 
 namespace http {
+    static bool case_insensitive_equals(std::string_view a, std::string_view b) {
+        return ranges::equal(a, b, [](char x, char y) {
+            return tolower(static_cast<unsigned char>(x)) == tolower(static_cast<unsigned char>(y));
+        });
+    }
+
     optional<string> Headers::get(string_view name) const {
-        // TODO: implement.
-        return std::nullopt;
+        optional<string> result;
+        
+        for (const auto& [key, val] : fields) {
+            if (!case_insensitive_equals(key, name)) {
+                continue;
+            }
+            
+            if (result) {
+                *result += ", ";
+            } else {
+                result = "";
+            }
+
+            *result += val;
+        }
+
+        return result;
     }
 
     vector<string> Headers::get_all(string_view name) const {
-        // TODO: implement.
-        return {};
+        vector<string> result;
+
+        for (const auto& [key, val] : fields) {
+            if (!case_insensitive_equals(key, name)) {
+                continue;
+            }
+            
+            result.push_back(val);
+        }
+
+        return result;
     }
 
-    void Headers::put(string name, string value) {
-        // TODO: implement.
+    void Headers::add(string name, string value) {
+        fields.emplace_back(name, value);
     }
 
     void Headers::remove(string_view name) {
-        // TODO: implement.
+        erase_if(fields, [name](const pair<string, string>& p) {
+            return case_insensitive_equals(name, p.first);
+        });
     }
 
     static optional<Method> parse_method(string_view s) {
