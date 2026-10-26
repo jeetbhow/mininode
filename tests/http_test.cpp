@@ -120,3 +120,119 @@ INSTANTIATE_TEST_SUITE_P(
         "\r\n"                              // empty line
     )
 );
+
+TEST(HeaderFields, ParsesHeaderFields) {
+    string request = "GET / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "Accept: text/html\r\n"
+                     "\r\n";
+
+    auto r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    ASSERT_TRUE(r->headers.fields.size() == 2);
+    EXPECT_EQ(r->headers.get("Host"), "example.com");
+    EXPECT_EQ(r->headers.get("Accept"), "text/html");
+}
+
+TEST(HeaderFields, NoHeaderFields) {
+    string request = "GET / HTTP/1.1\r\n"
+                     "\r\n";
+
+    auto r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    EXPECT_TRUE(r->headers.fields.empty());
+}
+
+TEST(HeaderFields, PreservesDuplicatesInOrder) {
+    string request = "GET / HTTP/1.1\r\n"
+                     "Accept: application/json\r\n"
+                     "Host: example.com\r\n"
+                     "Accept: text/html\r\n"
+                     "\r\n";
+
+    auto r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    EXPECT_EQ(r->headers.get_all("Accept"), (vector<string>{"application/json", "text/html"}));
+}
+
+TEST(HeaderFields, ValueMayContainColon) {
+    string request = "GET / HTTP/1.1\r\n"
+                     "Host: example.com:8080\r\n"
+                     "\r\n";
+
+    auto r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    EXPECT_EQ(r->headers.get("Host"), "example.com:8080");
+}
+
+TEST(HeaderFields, StopsAtEmptyLine) {
+    string request = "POST / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "\r\n"
+                     "Not-A-Header: body\r\n";
+
+    auto r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    ASSERT_TRUE(r->headers.fields.size() == 1);
+    EXPECT_FALSE(r->headers.get("Not-A-Header").has_value());
+}
+
+using WhitespaceCase = tuple<string, string>;
+
+class HeaderWhitespaceTest : public ::testing::TestWithParam<WhitespaceCase> {};
+
+TEST_P(HeaderWhitespaceTest, TrimsOptionalWhitespace) {
+    auto [line, value] = GetParam();
+    string request = "GET / HTTP/1.1\r\n" + line + "\r\n"
+                                                   "\r\n";
+
+    auto r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    EXPECT_EQ(r->headers.get("X-Test"), value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    HeaderFields,
+    HeaderWhitespaceTest,
+    ::testing::Values(
+        WhitespaceCase{"X-Test: value", "value"},
+        WhitespaceCase{"X-Test:value", "value"},
+        WhitespaceCase{"X-Test:   value   ", "value"},
+        WhitespaceCase{"X-Test:\tvalue\t", "value"},
+        WhitespaceCase{"X-Test: two words", "two words"},
+        WhitespaceCase{"X-Test:", ""},
+        WhitespaceCase{"X-Test:   ", ""}
+    )
+);
+
+class MalformedHeaderTest : public ::testing::TestWithParam<string> {};
+
+TEST_P(MalformedHeaderTest, ErrorOnMalformedHeader) {
+    auto r = parse_request(GetParam());
+
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ParseError::BadRequest);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    HeaderFields,
+    MalformedHeaderTest,
+    ::testing::Values(
+        "GET / HTTP/1.1\r\nHost example.com\r\n\r\n",                   // missing colon
+        "GET / HTTP/1.1\r\nHost : example.com\r\n\r\n",                 // space before colon
+        "GET / HTTP/1.1\r\n: example.com\r\n\r\n",                      // empty name
+        "GET / HTTP/1.1\r\nHost: example.com\r\n folded\r\n\r\n",       // obsolete line folding
+        "GET / HTTP/1.1\r\nX(Bad): value\r\n\r\n",                      // non-token name
+        "GET / HTTP/1.1\r\nHost: a\nAccept: b\r\n\r\n",                 // bare LF line ending
+        "GET / HTTP/1.1\r\nHost: a\rAccept: b\r\n\r\n",                 // bare CR in value
+        "GET / HTTP/1.1\r\nHost: a\0b\r\n\r\n"s,                       // NUL in value
+        "GET / HTTP/1.1\r\nHost: example.com\r\n",                      // no empty line
+        "GET / HTTP/1.1\r\n"                                            // no empty line, no headers
+    )
+);

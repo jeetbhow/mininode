@@ -12,6 +12,7 @@
 #include "http/http.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <ranges>
 
@@ -92,9 +93,86 @@ namespace http {
         return nullopt;
     }
 
+    // OWS = *( SP / HTAB ) (RFC 9110 §5.6.3)
+    static bool is_ows(char c) {
+        return c == ' ' || c == '\t';
+    }
+
+    // tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
+    //         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA (RFC 9110 §5.6.2)
+    static bool is_tchar(char c) {
+        return isalnum(static_cast<unsigned char>(c)) || "!#$%&'*+-.^_`|~"sv.contains(c);
+    }
+
+    static string_view ltrim(string_view s) {
+        auto it = ranges::find_if(s, [](char c) {
+            return !is_ows(c);
+        });
+
+        if (it == s.end()) {
+            return "";
+        }
+
+        return s.substr(it - s.begin());
+    }
+
+    static string_view rtrim(string_view s) {
+        auto reversed = s | views::reverse; 
+
+        auto it = ranges::find_if(reversed, [](char c) {
+            return !is_ows(c);
+        });
+
+        if (it == reversed.end()) {
+            return "";
+        }
+
+        return s.substr(0, s.size() - (it - reversed.begin()));
+    }
+
+    static string_view trim(string_view s) {
+        return ltrim(rtrim(s));
+    }
+
+    // `lines` is the header section without the empty line that ends it, so
+    // every line, including the last, ends in CRLF.
+    static expected<Headers, ParseError> parse_headers(string_view lines) {
+        Headers headers;
+
+        while (!lines.empty()) {
+            size_t line_end = lines.find("\r\n");
+            string_view line = lines.substr(0, line_end);
+
+            // This removes the current line being processed from `lines` in place. A 
+            // while loop ends when `lines` becomes empty. Since a `string_view` does
+            // not take ownership, the underlying string is preserved.
+            lines.remove_prefix(line_end + 2);
+
+            size_t colon = line.find(':');
+            if (colon == string_view::npos) {
+                return std::unexpected(ParseError::BadRequest);
+            }
+
+            string_view name = line.substr(0, colon);
+            string_view value = trim(line.substr(colon + 1));
+
+            if (name.empty() || !ranges::all_of(name, is_tchar)) {
+                return std::unexpected(ParseError::BadRequest);
+            }
+
+            // A bare CR or LF here means a line wasn't terminated by CRLF.
+            if (value.find_first_of("\r\n\0"sv) != string_view::npos) {
+                return std::unexpected(ParseError::BadRequest);
+            }
+
+            headers.add(string(name), string(value));
+        }
+
+        return headers;
+    }
+
     expected<Request, ParseError> parse_request(string_view request) {
-        // <method> <target> <version>\r\n
-        auto request_line_end = request.find("\r\n");
+        size_t request_line_end = request.find("\r\n");
         if (request_line_end == string_view::npos) {
             return std::unexpected(ParseError::BadRequest);
         }
@@ -122,12 +200,12 @@ namespace http {
             return std::unexpected(ParseError::BadRequest);
         }
 
-        auto method = parse_method(method_str);
+        optional<Method> method = parse_method(method_str);
         if (!method) {
             return std::unexpected(ParseError::UnsupportedMethod);
         }
 
-        auto version = parse_version(version_str);
+        optional<Version> version = parse_version(version_str);
         if (!version) {
             return std::unexpected(ParseError::UnsupportedVersion);
         }
@@ -137,7 +215,23 @@ namespace http {
         r.target = string(target);
         r.version = *version;
 
-        // TODO: parse header fields and body.
+        // The header section ends at the first empty line. Searching from the
+        // request line's CRLF means a request with no headers ends there too.
+        size_t headers_end = request.find("\r\n\r\n", request_line_end);
+        if (headers_end == string_view::npos) {
+            return std::unexpected(ParseError::BadRequest);
+        }
+
+        string_view header_lines = request.substr(request_line_end + 2, headers_end - request_line_end);
+
+        expected<Headers, ParseError> headers = parse_headers(header_lines);
+        if (!headers) {
+            return std::unexpected(headers.error());
+        }
+
+        r.headers = std::move(*headers);
+
+        // TODO: parse body, starting at headers_end + 4.
 
         return r;
     }
