@@ -1,8 +1,12 @@
-#include <iostream>
-
 #include <http/http.hpp>
 
+using namespace std;
+
 int main() {
-    std::cout << "Hello, world!\n";
+    string request = "GET / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "\r\n";    
+    http::parse_request(request);
+
     return 0;
 }

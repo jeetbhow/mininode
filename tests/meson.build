@@ -1,7 +1,7 @@
 gtest_dep = dependency('gtest', main: true, fallback: ['gtest', 'gtest_main_dep'])
 
 test_sources = files(
-    'smoke_test.cpp',
+    'http_test.cpp',
 )
 
 unit_tests = executable(
