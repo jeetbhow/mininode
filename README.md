@@ -1,8 +1,8 @@
 # http
 
-A C++20 executable built with Meson.
+A C++23 executable built with Meson.
 
-Install a C++ compiler, Meson, and Ninja, then run these commands from this directory:
+Install a C++ compiler with C++23 support, Meson, and Ninja, then run these commands from this directory:
 
 ```sh
 meson setup build

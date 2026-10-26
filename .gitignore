@@ -5,3 +5,6 @@
 /subprojects/packagecache/
 /subprojects/googletest-*/
 /subprojects/.wraplock
+
+# Symlink to build/compile_commands.json for clangd
+/compile_commands.json
