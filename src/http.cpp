@@ -21,7 +21,7 @@
 using namespace std;
 
 namespace http {
-    static bool case_insensitive_equals(std::string_view a, std::string_view b) {
+    static bool case_insensitive_equals(string_view a, string_view b) {
         return ranges::equal(a, b, [](char x, char y) {
             return tolower(static_cast<unsigned char>(x)) == tolower(static_cast<unsigned char>(y));
         });
@@ -165,19 +165,19 @@ namespace http {
 
             size_t colon = line.find(':');
             if (colon == string_view::npos) {
-                return std::unexpected(ParseError::BadRequest);
+                return unexpected(ParseError::BadRequest);
             }
 
             string_view name = line.substr(0, colon);
             string_view value = trim(line.substr(colon + 1));
 
             if (name.empty() || !ranges::all_of(name, is_tchar)) {
-                return std::unexpected(ParseError::BadRequest);
+                return unexpected(ParseError::BadRequest);
             }
 
             // A bare CR or LF here means a line wasn't terminated by CRLF.
             if (value.find_first_of("\r\n\0"sv) != string_view::npos) {
-                return std::unexpected(ParseError::BadRequest);
+                return unexpected(ParseError::BadRequest);
             }
 
             headers.add(string(name), string(value));
@@ -209,7 +209,7 @@ namespace http {
             }
 
             if (i + 2 >= s.size()) {
-                return std::unexpected(ParseError::BadRequest);
+                return unexpected(ParseError::BadRequest);
             }
 
             unsigned char byte = 0;
@@ -218,7 +218,7 @@ namespace http {
             auto [ptr, ec] = from_chars(begin, end, byte, 16);
 
             if (ec != errc{} || ptr != end) {
-                return std::unexpected(ParseError::BadRequest);
+                return unexpected(ParseError::BadRequest);
             }
 
             result += byte;
@@ -248,18 +248,18 @@ namespace http {
 
             size_t equal = param.find('=');
             if (equal == string_view::npos) {
-                return std::unexpected(ParseError::BadRequest);
+                return unexpected(ParseError::BadRequest);
             }
 
             expected<string, ParseError> key = decode_query_component(param.substr(0, equal));
             expected<string, ParseError> val = decode_query_component(param.substr(equal + 1));
 
             if (!key) {
-                return std::unexpected(key.error());
+                return unexpected(key.error());
             }
 
             if (!val) {
-                return std::unexpected(val.error());
+                return unexpected(val.error());
             }
 
             result[*key] = *val;
@@ -271,7 +271,7 @@ namespace http {
     expected<Request, ParseError> parse_request(string_view request) {
         size_t request_line_end = request.find("\r\n");
         if (request_line_end == string_view::npos) {
-            return std::unexpected(ParseError::BadRequest);
+            return unexpected(ParseError::BadRequest);
         }
 
         string_view request_line_sv = request.substr(0, request_line_end);
@@ -284,7 +284,7 @@ namespace http {
         // Parts are separated by exactly one space, so a doubled or leading
         // space shows up as an empty part.
         if (parts.size() != 3 || ranges::any_of(parts, [](string_view p) { return p.empty(); })) {
-            return std::unexpected(ParseError::BadRequest);
+            return unexpected(ParseError::BadRequest);
         }
 
         string_view method_str = parts[0];
@@ -293,17 +293,17 @@ namespace http {
 
         // Check syntax before support, so "GET / garbage" is 400 rather than 505.
         if (!is_http_version(version_str)) {
-            return std::unexpected(ParseError::BadRequest);
+            return unexpected(ParseError::BadRequest);
         }
 
         optional<Method> method = parse_method(method_str);
         if (!method) {
-            return std::unexpected(ParseError::UnsupportedMethod);
+            return unexpected(ParseError::UnsupportedMethod);
         }
 
         optional<Version> version = parse_version(version_str);
         if (!version) {
-            return std::unexpected(ParseError::UnsupportedVersion);
+            return unexpected(ParseError::UnsupportedVersion);
         }
 
         size_t question_mark = target.find('?');
@@ -312,7 +312,7 @@ namespace http {
 
         expected<unordered_map<string, string>, ParseError> query_params = parse_query_params(query_sv);
         if (!query_params) {
-            return std::unexpected(query_params.error());
+            return unexpected(query_params.error());
         }
 
         Request r{};
@@ -325,14 +325,14 @@ namespace http {
         // request line's CRLF means a request with no headers ends there too.
         size_t headers_end = request.find("\r\n\r\n", request_line_end);
         if (headers_end == string_view::npos) {
-            return std::unexpected(ParseError::BadRequest);
+            return unexpected(ParseError::BadRequest);
         }
 
         string_view header_lines = request.substr(request_line_end + 2, headers_end - request_line_end);
 
         expected<Headers, ParseError> headers = parse_headers(header_lines);
         if (!headers) {
-            return std::unexpected(headers.error());
+            return unexpected(headers.error());
         }
 
         r.headers = std::move(*headers);
