@@ -15,6 +15,7 @@
 #include <cctype>
 #include <charconv>
 #include <cstdio>
+#include <expected>
 #include <ranges>
 
 using namespace std;
@@ -197,17 +198,86 @@ namespace http {
         return result;
     }
 
+    expected<string, ParseError> decode_percent(string_view s) {
+        string result = "";
+        size_t i = 0;
+        while (i < s.size()) {
+            if (s[i] != '%') {
+                result += s[i];
+                i++;
+                continue;
+            }
+
+            if (i + 2 >= s.size()) {
+                return std::unexpected(ParseError::BadRequest);
+            }
+
+            unsigned char byte = 0;
+            const char* begin = s.data() + i + 1;
+            const char* end = begin + 2;
+            auto [ptr, ec] = from_chars(begin, end, byte, 16);
+
+            if (ec != errc{} || ptr != end) {
+                return std::unexpected(ParseError::BadRequest);
+            }
+
+            result += byte;
+            i += 3;
+        }
+        return result;
+    }
+
+    static expected<string, ParseError> decode_query_component(string_view s) {
+        // Form encoding sends spaces as '+'. Replace them before percent-decoding
+        // so an encoded "%2B" survives as a literal '+'.
+        string with_spaces(s);
+        ranges::replace(with_spaces, '+', ' ');
+        return decode_percent(with_spaces);
+    }
+
+    static expected<unordered_map<string, string>, ParseError> parse_query_params(string_view query) {
+        unordered_map<string, string> result;
+
+        for (auto part : query | views::split('&')) {
+            string_view param(part.begin(), part.end());
+
+            // "a=1&&b=2" and a trailing "&" leave empty pieces; skip them.
+            if (param.empty()) {
+                continue;
+            }
+
+            size_t equal = param.find('=');
+            if (equal == string_view::npos) {
+                return std::unexpected(ParseError::BadRequest);
+            }
+
+            expected<string, ParseError> key = decode_query_component(param.substr(0, equal));
+            expected<string, ParseError> val = decode_query_component(param.substr(equal + 1));
+
+            if (!key) {
+                return std::unexpected(key.error());
+            }
+
+            if (!val) {
+                return std::unexpected(val.error());
+            }
+
+            result[*key] = *val;
+        }
+
+        return result;
+    }
+
     expected<Request, ParseError> parse_request(string_view request) {
         size_t request_line_end = request.find("\r\n");
         if (request_line_end == string_view::npos) {
             return std::unexpected(ParseError::BadRequest);
         }
 
-        string_view request_line = request.substr(0, request_line_end);
+        string_view request_line_sv = request.substr(0, request_line_end);
 
         vector<string_view> parts;
-
-        for (auto part : request_line | views::split(' ')) {
+        for (auto part : request_line_sv | views::split(' ')) {
             parts.emplace_back(part.begin(), part.end());
         }
 
@@ -236,10 +306,20 @@ namespace http {
             return std::unexpected(ParseError::UnsupportedVersion);
         }
 
+        size_t question_mark = target.find('?');
+        string_view path_sv = target.substr(0, question_mark);
+        string_view query_sv = question_mark == string_view::npos ? "" : target.substr(question_mark + 1);
+
+        expected<unordered_map<string, string>, ParseError> query_params = parse_query_params(query_sv);
+        if (!query_params) {
+            return std::unexpected(query_params.error());
+        }
+
         Request r{};
         r.method = *method;
-        r.target = string(target);
+        r.path = path_sv;
         r.version = *version;
+        r.query_params = *query_params;
 
         // The header section ends at the first empty line. Searching from the
         // request line's CRLF means a request with no headers ends there too.

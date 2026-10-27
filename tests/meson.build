@@ -11,4 +11,6 @@ unit_tests = executable(
   dependencies: [http_dep, gtest_dep],
 )
 
-test('unit', unit_tests)
+# GTEST_BRIEF prints only failures, so they fit in the log tail that
+# `meson test --print-errorlogs` shows.
+test('unit', unit_tests, env: ['GTEST_BRIEF=1'])

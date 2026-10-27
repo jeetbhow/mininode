@@ -16,6 +16,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 #include <optional>
 
 namespace http {
@@ -131,14 +132,17 @@ namespace http {
         /// The header fields.
         Headers headers;
 
+        /// The query parameters, e.g. {"sort": "asc"} for "?sort=asc".
+        std::unordered_map<std::string, std::string> query_params;
+
         /// The request method, e.g. GET.
         Method method = Method::Get;
 
         /// The protocol version from the request line.
         Version version = Version::Http11;
 
-        /// The raw request target, e.g. "/users/42?sort=asc".
-        std::string target;
+        /// The request path without the query string, e.g. "/users/42".
+        std::string path;
 
         /// The request body. Empty if the request has none.
         std::string body;
@@ -169,4 +173,14 @@ namespace http {
      * @return The parsed request, or the reason it couldn't be parsed.
      */
     std::expected<Request, ParseError> parse_request(std::string_view request);
+
+    /**
+     * @brief Decodes `%XX` escapes in a URL component, e.g. "a%20b" -> "a b".
+     *
+     * @param s The encoded component, such as a query parameter's key or value.
+     *
+     * @return The decoded bytes, or `ParseError::BadRequest` if an escape is
+     *         truncated or isn't two hex digits.
+     */
+    std::expected<std::string, ParseError> decode_percent(std::string_view s);
 }

@@ -5,14 +5,14 @@ using namespace std;
 using namespace http;
 
 TEST(RequestLine, ParsesMethodTargetAndVersion) {
-    string request = "GET /users/42?sort=asc HTTP/1.1\r\n"
+    string request = "GET /users/42 HTTP/1.1\r\n"
                      "\r\n";
 
     auto r = parse_request(request);
     ASSERT_TRUE(r.has_value());
 
     EXPECT_EQ(r->method, Method::Get);
-    EXPECT_EQ(r->target, "/users/42?sort=asc");
+    EXPECT_EQ(r->path, "/users/42");
     EXPECT_EQ(r->version, Version::Http11);
 }
 
@@ -300,3 +300,115 @@ TEST(Body, TrimBodyWhenContentLengthShorter) {
     ASSERT_TRUE(r.has_value());
     EXPECT_EQ(r->body, "bod");
 }
+
+TEST(QueryParams, ParseSingleQueryParam) {
+    string request = "POST /submit?param1=value1 HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "Content-Length: 3\r\n"
+                     "\r\n"
+                     "body";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query_params["param1"], "value1");
+}
+
+TEST(QueryParams, ParseMultipleQueryParams) {
+    string request = "GET /search?param1=value1&param2=value2 HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->path, "/search");
+    EXPECT_EQ(r->query_params.size(), 2);
+    EXPECT_EQ(r->query_params["param1"], "value1");
+    EXPECT_EQ(r->query_params["param2"], "value2");
+}
+
+TEST(QueryParams, DecodesKeysAndValues) {
+    string request = "GET /search?first%20name=a%26b HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query_params.size(), 1);
+    EXPECT_EQ(r->query_params["first name"], "a&b");
+}
+
+using PlusCase = tuple<string, string, string>;
+
+class QueryPlusTest : public ::testing::TestWithParam<PlusCase> {};
+
+TEST_P(QueryPlusTest, DecodesPlusAsSpace) {
+    auto [query, key, value] = GetParam();
+    string request = "GET /search?" + query + " HTTP/1.1\r\n"
+                                              "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query_params.size(), 1);
+    EXPECT_EQ(r->query_params[key], value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QueryParams,
+    QueryPlusTest,
+    ::testing::Values(
+        PlusCase{"q=hello+world", "q", "hello world"},     // plus in a value
+        PlusCase{"first+name=Ada", "first name", "Ada"},   // plus in a key
+        PlusCase{"q=a%2Bb", "q", "a+b"},                   // encoded plus stays literal
+        PlusCase{"q=a+%2B+b", "q", "a + b"}                // both together
+    )
+);
+
+using DecodeCase = tuple<string, string>;
+
+class DecodePercentTest : public ::testing::TestWithParam<DecodeCase> {};
+
+TEST_P(DecodePercentTest, DecodesEscapes) {
+    auto [input, want] = GetParam();
+
+    auto r = decode_percent(input);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(*r, want);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QueryParams,
+    DecodePercentTest,
+    ::testing::Values(
+        DecodeCase{"hello%20world", "hello world"},    // basic escape
+        DecodeCase{"plain", "plain"},                  // no escapes
+        DecodeCase{"", ""},                            // empty input
+        DecodeCase{"%2f%2F", "//"},                    // lower- and upper-case hex
+        DecodeCase{"a%26b%3Dc", "a&b=c"},              // reserved characters
+        DecodeCase{"caf%C3%A9", "caf\xC3\xA9"},        // bytes above 127 (UTF-8 "café")
+        DecodeCase{"100%25", "100%"},                  // literal percent
+        DecodeCase{"%2541", "%41"},                    // decodes only once
+        DecodeCase{"%41%42", "AB"}                     // back-to-back escapes
+    )
+);
+
+class DecodePercentInvalidTest : public ::testing::TestWithParam<string> {};
+
+TEST_P(DecodePercentInvalidTest, RejectsMalformedEscape) {
+    auto r = decode_percent(GetParam());
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ParseError::BadRequest);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QueryParams,
+    DecodePercentInvalidTest,
+    ::testing::Values(
+        "%",        // percent at the end
+        "abc%",     // percent at the end after text
+        "%4",       // one hex digit
+        "%zz",      // non-hex digits
+        "%4z"       // second digit not hex
+    )
+);
