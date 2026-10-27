@@ -2,6 +2,8 @@ project(
   'http',
   'cpp',
   version: '0.0.1',
+  license: 'MIT',
+  license_files: 'LICENSE',
   default_options: [
     'cpp_std=c++23',
     'warning_level=2',
