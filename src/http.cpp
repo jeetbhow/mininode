@@ -27,23 +27,12 @@ namespace http {
     }
 
     optional<string> Headers::get(string_view name) const {
-        optional<string> result;
-        
-        for (const auto& [key, val] : fields) {
-            if (!case_insensitive_equals(key, name)) {
-                continue;
-            }
-            
-            if (result) {
-                *result += ", ";
-            } else {
-                result = "";
-            }
-
-            *result += val;
+        vector<string> values = get_all(name);
+        if (values.empty()) {
+            return nullopt;
         }
 
-        return result;
+        return ranges::to<string>(values | views::join_with(", "sv));
     }
 
     vector<string> Headers::get_all(string_view name) const {
