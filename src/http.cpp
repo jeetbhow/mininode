@@ -244,16 +244,24 @@ namespace http {
         return result;
     }
 
-    expected<Request, ParseError> parse_request(string_view request) {
-        size_t request_line_end = request.find("\r\n");
-        if (request_line_end == string_view::npos) {
-            return unexpected(ParseError::BadRequest);
-        }
+    namespace {
+        // A request line with its method and version parsed.
+        struct RequestLine {
+            Method method;
+            string_view target;
+            Version version;
+        };
 
-        string_view request_line = request.substr(0, request_line_end);
+        // A request target split into its path and decoded query parameters.
+        struct Target {
+            string_view path;
+            unordered_map<string, string> query_params;
+        };
+    }
 
+    static expected<RequestLine, ParseError> parse_request_line(string_view line) {
         vector<string_view> parts;
-        for (auto part : request_line | views::split(' ')) {
+        for (auto part : line | views::split(' ')) {
             parts.emplace_back(part.begin(), part.end());
         }
 
@@ -264,7 +272,7 @@ namespace http {
         }
 
         string_view method_str = parts[0];
-        string_view target = parts[1]; 
+        string_view target = parts[1];
         string_view version_str = parts[2];
 
         // Check syntax before support, so "GET / garbage" is 400 rather than 505.
@@ -282,6 +290,10 @@ namespace http {
             return unexpected(ParseError::UnsupportedVersion);
         }
 
+        return RequestLine{*method, target, *version};
+    }
+
+    static expected<Target, ParseError> parse_target(string_view target) {
         // A target without a '?' is all path and has an empty query.
         string_view path = target;
         string_view query;
@@ -295,11 +307,44 @@ namespace http {
             return unexpected(query_params.error());
         }
 
-        Request r{};
-        r.method = *method;
-        r.path = path;
-        r.version = *version;
-        r.query_params = *query_params;
+        return Target{path, std::move(*query_params)};
+    }
+
+    // `rest` is everything after the empty line that ends the header section.
+    static expected<string, ParseError> parse_body(string_view rest, const Headers& headers) {
+        optional<string> content_length_header = headers.get("Content-Length");
+        if (!content_length_header) {
+            return string();
+        }
+
+        optional<size_t> content_length = parse_number<size_t>(*content_length_header);
+        if (!content_length) {
+            return unexpected(ParseError::BadRequest);
+        }
+
+        string_view body = rest.substr(0, *content_length);
+        if (body.size() != *content_length) {
+            return unexpected(ParseError::BadRequest);
+        }
+
+        return string(body);
+    }
+
+    expected<Request, ParseError> parse_request(string_view request) {
+        size_t request_line_end = request.find("\r\n");
+        if (request_line_end == string_view::npos) {
+            return unexpected(ParseError::BadRequest);
+        }
+
+        expected<RequestLine, ParseError> line = parse_request_line(request.substr(0, request_line_end));
+        if (!line) {
+            return unexpected(line.error());
+        }
+
+        expected<Target, ParseError> target = parse_target(line->target);
+        if (!target) {
+            return unexpected(target.error());
+        }
 
         // The header section ends at the first empty line. Searching from the
         // request line's CRLF means a request with no headers ends there too.
@@ -315,24 +360,18 @@ namespace http {
             return unexpected(headers.error());
         }
 
+        expected<string, ParseError> body = parse_body(request.substr(headers_end + 4), *headers);
+        if (!body) {
+            return unexpected(body.error());
+        }
+
+        Request r{};
+        r.method = line->method;
+        r.version = line->version;
+        r.path = target->path;
+        r.query_params = std::move(target->query_params);
         r.headers = std::move(*headers);
-
-        optional<string> content_length_header = r.headers.get("Content-Length");
-        if (!content_length_header) {
-            return r;
-        }
-
-        optional<size_t> content_length = parse_number<size_t>(*content_length_header);
-        if (!content_length) {
-            return unexpected(ParseError::BadRequest);
-        }
-
-        string_view body = request.substr(headers_end + 4, *content_length);
-        if (body.size() != *content_length) {
-            return unexpected(ParseError::BadRequest);
-        }
-
-        r.body = body;
+        r.body = std::move(*body);
 
         return r;
     }
