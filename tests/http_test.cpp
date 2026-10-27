@@ -231,8 +231,66 @@ INSTANTIATE_TEST_SUITE_P(
         "GET / HTTP/1.1\r\nX(Bad): value\r\n\r\n",                      // non-token name
         "GET / HTTP/1.1\r\nHost: a\nAccept: b\r\n\r\n",                 // bare LF line ending
         "GET / HTTP/1.1\r\nHost: a\rAccept: b\r\n\r\n",                 // bare CR in value
-        "GET / HTTP/1.1\r\nHost: a\0b\r\n\r\n"s,                       // NUL in value
+        "GET / HTTP/1.1\r\nHost: a\0b\r\n\r\n"s,                        // NUL in value
         "GET / HTTP/1.1\r\nHost: example.com\r\n",                      // no empty line
         "GET / HTTP/1.1\r\n"                                            // no empty line, no headers
     )
 );
+
+TEST(Body, ParsesBodyWithValidContentLength) {
+    string request = "POST / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "Content-Length: 4\r\n"
+                     "\r\n"
+                     "body";
+
+    expected<Request, ParseError> r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->body, "body");
+}
+
+class ContentLengthValueTest : public ::testing::TestWithParam<string> {};
+
+TEST_P(ContentLengthValueTest, ErrorOnInvalidContentLength) {
+    string value = GetParam();
+
+    string request = format("POST / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "Content-Length: {}\r\n"
+                     "\r\n"
+                     "body", value);
+
+    expected<Request, ParseError> r = parse_request(request);
+    EXPECT_FALSE(r.has_value());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Body,
+    ContentLengthValueTest,
+    ::testing::Values(
+        "-2", "", "5"
+    )
+);
+
+TEST(Body, MissingContentLengthSkipsBody) {
+    string request = "POST / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "\r\n"
+                     "body\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_TRUE(r->body.empty());
+}
+
+TEST(Body, TrimBodyWhenContentLengthShorter) {
+    string request = "POST / HTTP/1.1\r\n"
+                     "Host: example.com\r\n"
+                     "Content-Length: 3\r\n"
+                     "\r\n"
+                     "body";
+
+    expected<Request, ParseError> r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->body, "bod");
+}

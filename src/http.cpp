@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cstdio>
 #include <ranges>
 
@@ -171,6 +172,18 @@ namespace http {
         return headers;
     }
 
+    static optional<size_t> parse_ulong(string_view s) {
+        size_t result;
+        const char* end = s.data() + s.size();
+        auto [ptr, ec] = from_chars(s.data(), end, result);
+
+        if (ec != errc{} || ptr != end) {
+            return nullopt;
+        }
+
+        return result;
+    }
+
     expected<Request, ParseError> parse_request(string_view request) {
         size_t request_line_end = request.find("\r\n");
         if (request_line_end == string_view::npos) {
@@ -231,7 +244,22 @@ namespace http {
 
         r.headers = std::move(*headers);
 
-        // TODO: parse body, starting at headers_end + 4.
+        optional<string> result = r.headers.get("Content-Length");
+        if (!result) {
+            return r;
+        }
+
+        optional<size_t> content_length = parse_ulong(*result);
+        if (!content_length) {
+            return unexpected(ParseError::BadRequest);
+        }
+
+        string_view body = request.substr(headers_end + 4, *content_length);
+        if (body.size() != *content_length) {
+            return unexpected(ParseError::BadRequest);
+        }
+
+        r.body = body;
 
         return r;
     }
