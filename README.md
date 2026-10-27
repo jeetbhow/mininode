@@ -8,19 +8,18 @@ Install a C++ compiler with C++23 support, Meson, and Ninja, then run these comm
 meson setup build
 meson compile -C build
 meson test -C build
-./build/src/http
+./build/app/app
 ```
 
-On Windows, run `build\src\http.exe`.
+On Windows, run `build\app\app.exe`.
 
 Put source files in `src/` and headers in `include/`. Add new source files to
 `src/meson.build`. The `runs` smoke test verifies that the executable exits successfully;
 add behavior tests as the project grows.
 
-
 ## Roadmap
 
-- [X] Request parsing
+- [x] Request parsing
 - [ ] Router
 - [ ] Response
 - [ ] Route registration

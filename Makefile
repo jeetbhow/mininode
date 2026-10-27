@@ -16,7 +16,7 @@ test: build
 	meson test -C $(BUILD_DIR) --print-errorlogs
 
 run: build
-	./$(BUILD_DIR)/src/http
+	./$(BUILD_DIR)/app/app
 
 # Recreate the build directory, e.g. after moving the project or changing compiler.
 reconfigure:

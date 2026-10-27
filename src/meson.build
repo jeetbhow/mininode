@@ -12,12 +12,3 @@ http_dep = declare_dependency(
   link_with: http_lib,
   include_directories: project_inc,
 )
-
-app = executable(
-  'http',
-  files('main.cpp'),
-  dependencies: http_dep,
-  install: true,
-)
-
-test('runs', app)
