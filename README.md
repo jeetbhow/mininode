@@ -20,7 +20,7 @@ add behavior tests as the project grows.
 
 ## Roadmap
 
-- [ ] Request parsing
+- [X] Request parsing
 - [ ] Router
 - [ ] Response
 - [ ] Route registration
