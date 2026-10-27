@@ -127,6 +127,17 @@ namespace http {
         return s.substr(first, last - first + 1);
     }
 
+    // Splits `s` at the first `delim` into the parts before and after it, or
+    // returns nullopt if `delim` isn't in `s`.
+    static optional<pair<string_view, string_view>> split_once(string_view s, char delim) {
+        size_t pos = s.find(delim);
+        if (pos == string_view::npos) {
+            return nullopt;
+        }
+
+        return pair{s.substr(0, pos), s.substr(pos + 1)};
+    }
+
     // `lines` is the header section without the empty line that ends it, so
     // every line, including the last, ends in CRLF.
     static expected<Headers, ParseError> parse_headers(string_view lines) {
@@ -141,13 +152,13 @@ namespace http {
             // not take ownership, the underlying string is preserved.
             lines.remove_prefix(line_end + 2);
 
-            size_t colon = line.find(':');
-            if (colon == string_view::npos) {
+            optional<pair<string_view, string_view>> field = split_once(line, ':');
+            if (!field) {
                 return unexpected(ParseError::BadRequest);
             }
 
-            string_view name = line.substr(0, colon);
-            string_view value = trim(line.substr(colon + 1));
+            string_view name = field->first;
+            string_view value = trim(field->second);
 
             if (name.empty() || !ranges::all_of(name, is_tchar)) {
                 return unexpected(ParseError::BadRequest);
@@ -164,10 +175,13 @@ namespace http {
         return headers;
     }
 
-    static optional<size_t> parse_ulong(string_view s) {
-        size_t result;
+    // Parses all of `s` as a number in `base`, or returns nullopt if `s` is
+    // empty, has a character that isn't a digit, or doesn't fit in `T`.
+    template <typename T>
+    static optional<T> parse_number(string_view s, int base = 10) {
+        T result{};
         const char* end = s.data() + s.size();
-        auto [ptr, ec] = from_chars(s.data(), end, result);
+        auto [ptr, ec] = from_chars(s.data(), end, result, base);
 
         if (ec != errc{} || ptr != end) {
             return nullopt;
@@ -190,16 +204,12 @@ namespace http {
                 return unexpected(ParseError::BadRequest);
             }
 
-            unsigned char byte = 0;
-            const char* begin = s.data() + i + 1;
-            const char* end = begin + 2;
-            auto [ptr, ec] = from_chars(begin, end, byte, 16);
-
-            if (ec != errc{} || ptr != end) {
+            optional<unsigned char> byte = parse_number<unsigned char>(s.substr(i + 1, 2), 16);
+            if (!byte) {
                 return unexpected(ParseError::BadRequest);
             }
 
-            result += byte;
+            result += *byte;
             i += 3;
         }
         return result;
@@ -224,13 +234,13 @@ namespace http {
                 continue;
             }
 
-            size_t equal = param.find('=');
-            if (equal == string_view::npos) {
+            optional<pair<string_view, string_view>> key_value = split_once(param, '=');
+            if (!key_value) {
                 return unexpected(ParseError::BadRequest);
             }
 
-            expected<string, ParseError> key = decode_query_component(param.substr(0, equal));
-            expected<string, ParseError> val = decode_query_component(param.substr(equal + 1));
+            expected<string, ParseError> key = decode_query_component(key_value->first);
+            expected<string, ParseError> val = decode_query_component(key_value->second);
 
             if (!key) {
                 return unexpected(key.error());
@@ -284,9 +294,13 @@ namespace http {
             return unexpected(ParseError::UnsupportedVersion);
         }
 
-        size_t question_mark = target.find('?');
-        string_view path_sv = target.substr(0, question_mark);
-        string_view query_sv = question_mark == string_view::npos ? "" : target.substr(question_mark + 1);
+        // A target without a '?' is all path and has an empty query.
+        string_view path_sv = target;
+        string_view query_sv;
+        if (optional<pair<string_view, string_view>> split = split_once(target, '?')) {
+            path_sv = split->first;
+            query_sv = split->second;
+        }
 
         expected<unordered_map<string, string>, ParseError> query_params = parse_query_params(query_sv);
         if (!query_params) {
@@ -320,7 +334,7 @@ namespace http {
             return r;
         }
 
-        optional<size_t> content_length = parse_ulong(*result);
+        optional<size_t> content_length = parse_number<size_t>(*result);
         if (!content_length) {
             return unexpected(ParseError::BadRequest);
         }
