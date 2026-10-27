@@ -55,6 +55,12 @@ TEST_P(MethodNameTest, MapsMethodName) {
     EXPECT_EQ(r->method, method);
 }
 
+TEST_P(MethodNameTest, ConvertsMethodToString) {
+    auto [name, method] = GetParam();
+
+    EXPECT_EQ(to_string(method), name);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     RequestLine,
     MethodNameTest,

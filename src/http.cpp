@@ -82,6 +82,19 @@ namespace http {
         return nullopt;
     }
 
+    string_view to_string(Method method) {
+        switch (method) {
+            case Method::Get: return "GET";
+            case Method::Head: return "HEAD";
+            case Method::Post: return "POST";
+            case Method::Put: return "PUT";
+            case Method::Delete: return "DELETE";
+            case Method::Patch: return "PATCH";
+            case Method::Options: return "OPTIONS";
+        }
+        unreachable();
+    }
+
     // HTTP-version = "HTTP/" DIGIT "." DIGIT
     static bool is_http_version(string_view s) {
         auto is_digit = [](char c) { return c >= '0' && c <= '9'; };

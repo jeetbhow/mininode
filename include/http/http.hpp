@@ -35,6 +35,14 @@ namespace http {
     };
 
     /**
+     * @brief Returns the method's name as it appears in a request line.
+     *
+     * @param method The method to convert.
+     * @return The uppercase method name, e.g. "GET".
+     */
+    std::string_view to_string(Method method);
+
+    /**
      * @brief HTTP protocol versions supported by the server.
      *
      * Requests using any other version are rejected with 505 HTTP Version Not Supported.
