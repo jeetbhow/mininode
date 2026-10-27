@@ -98,7 +98,9 @@ namespace http {
         return headers;
     }
 
-    expected<string, ParseError> decode_percent(string_view s) {
+    // Decodes `%XX` escapes in a URL component, e.g. "a%20b" -> "a b". Fails
+    // with BadRequest if an escape is truncated or isn't two hex digits.
+    static expected<string, ParseError> decode_percent(string_view s) {
         string result;
         size_t i = 0;
         while (i < s.size()) {

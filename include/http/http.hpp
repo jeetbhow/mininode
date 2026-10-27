@@ -88,7 +88,8 @@ namespace http {
      *
      * Fails with:
      * - `ParseError::BadRequest` if the request line or a header line is
-     *   malformed, `Content-Length` is invalid, or the body is shorter than
+     *   malformed, a query parameter has no `=` or a bad `%XX` escape,
+     *   `Content-Length` is invalid, or the body is shorter than
      *   `Content-Length` says;
      * - `ParseError::UnsupportedMethod` if the method isn't one of `Method`;
      * - `ParseError::UnsupportedVersion` if the version isn't one of `Version`.
@@ -99,14 +100,4 @@ namespace http {
      * @return The parsed request, or the reason it couldn't be parsed.
      */
     std::expected<Request, ParseError> parse_request(std::string_view request);
-
-    /**
-     * @brief Decodes `%XX` escapes in a URL component, e.g. "a%20b" -> "a b".
-     *
-     * @param s The encoded component, such as a query parameter's key or value.
-     *
-     * @return The decoded bytes, or `ParseError::BadRequest` if an escape is
-     *         truncated or isn't two hex digits.
-     */
-    std::expected<std::string, ParseError> decode_percent(std::string_view s);
 }

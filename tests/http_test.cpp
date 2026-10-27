@@ -369,12 +369,16 @@ using DecodeCase = tuple<string, string>;
 
 class DecodePercentTest : public ::testing::TestWithParam<DecodeCase> {};
 
+// `decode_percent` is private, so these tests reach it through a query value.
 TEST_P(DecodePercentTest, DecodesEscapes) {
     auto [input, want] = GetParam();
+    string request = "GET /search?q=" + input + " HTTP/1.1\r\n"
+                                                "\r\n";
 
-    auto r = decode_percent(input);
+    expected<Request, ParseError> r = parse_request(request);
+
     ASSERT_TRUE(r.has_value());
-    EXPECT_EQ(*r, want);
+    EXPECT_EQ(r->query_params["q"], want);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -396,7 +400,11 @@ INSTANTIATE_TEST_SUITE_P(
 class DecodePercentInvalidTest : public ::testing::TestWithParam<string> {};
 
 TEST_P(DecodePercentInvalidTest, RejectsMalformedEscape) {
-    auto r = decode_percent(GetParam());
+    string request = "GET /search?q=" + GetParam() + " HTTP/1.1\r\n"
+                                                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), ParseError::BadRequest);
 }
