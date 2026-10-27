@@ -1,6 +1,7 @@
 BUILD_DIR ?= build
 CC = clang-20
 CXX = clang++-20
+ARGS ?=
 
 .PHONY: all build test run reconfigure clean
 
@@ -16,7 +17,7 @@ test: build
 	meson test -C $(BUILD_DIR) --print-errorlogs
 
 run: build
-	./$(BUILD_DIR)/app/app
+	./$(BUILD_DIR)/app/app $(ARGS)
 
 # Recreate the build directory, e.g. after moving the project or changing compiler.
 reconfigure:
