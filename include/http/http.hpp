@@ -83,7 +83,8 @@ namespace http {
          *
          * @param name The parameter's decoded name, e.g. "sort".
          * @return The decoded value, or `std::nullopt` if there's no such
-         *         parameter. A key with an empty value, e.g. "?q=", gives "".
+         *         parameter. A key with an empty value or no `=`, e.g. "?q="
+         *         or "?q", gives "".
          */
         std::optional<std::string> query(const std::string& name) const;
     };
@@ -102,7 +103,7 @@ namespace http {
      *
      * Fails with:
      * - `ParseError::BadRequest` if the request line or a header line is
-     *   malformed, a query parameter has no `=` or a bad `%XX` escape,
+     *   malformed, a query parameter has a bad `%XX` escape,
      *   `Content-Length` is invalid, or the body is shorter than
      *   `Content-Length` says;
      * - `ParseError::UnsupportedMethod` if the method isn't one of `Method`;

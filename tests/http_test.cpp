@@ -349,8 +349,31 @@ TEST(QueryParams, RepeatedKeyKeepsLastValue) {
     EXPECT_EQ(r->query_params["q"], "b");
 }
 
-TEST(QueryParams, ErrorOnKeyWithoutEquals) {
+TEST(QueryParams, KeyWithoutEqualsHasEmptyValue) {
     string request = "GET /search?flag HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query_params.size(), 1);
+    EXPECT_EQ(r->query("flag"), "");
+}
+
+TEST(QueryParams, MixesKeysWithAndWithoutEquals) {
+    string request = "GET /search?flag&sort=asc HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query_params.size(), 2);
+    EXPECT_EQ(r->query("flag"), "");
+    EXPECT_EQ(r->query("sort"), "asc");
+}
+
+TEST(QueryParams, ErrorOnBadEscapeInKeyWithoutEquals) {
+    string request = "GET /search?a%zz HTTP/1.1\r\n"
                      "\r\n";
 
     expected<Request, ParseError> r = parse_request(request);

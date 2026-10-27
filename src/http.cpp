@@ -154,13 +154,11 @@ namespace http {
                 continue;
             }
 
-            optional<pair<string_view, string_view>> key_value = split_once(param, '=');
-            if (!key_value) {
-                return unexpected(ParseError::BadRequest);
-            }
+            // A key without '=' (e.g. "?flag") has an empty value, as in Express.
+            auto [raw_key, raw_val] = split_once(param, '=').value_or(pair{param, ""sv});
 
-            expected<string, ParseError> key = decode_query_component(key_value->first);
-            expected<string, ParseError> val = decode_query_component(key_value->second);
+            expected<string, ParseError> key = decode_query_component(raw_key);
+            expected<string, ParseError> val = decode_query_component(raw_val);
 
             if (!key) {
                 return unexpected(key.error());
