@@ -7,55 +7,17 @@
  */
 
 #include "http/http.hpp"
+#include "http/utils.hpp"
 
 #include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <expected>
 #include <ranges>
+#include <utility>
 
 using namespace std;
 
 namespace http {
-    static bool case_insensitive_equals(string_view a, string_view b) {
-        return ranges::equal(a, b, [](char x, char y) {
-            return tolower(static_cast<unsigned char>(x)) == tolower(static_cast<unsigned char>(y));
-        });
-    }
-
-    optional<string> Headers::get(string_view name) const {
-        vector<string> values = get_all(name);
-        if (values.empty()) {
-            return nullopt;
-        }
-
-        return ranges::to<string>(values | views::join_with(", "sv));
-    }
-
-    vector<string> Headers::get_all(string_view name) const {
-        vector<string> result;
-
-        for (const auto& [key, val] : fields) {
-            if (!case_insensitive_equals(key, name)) {
-                continue;
-            }
-            
-            result.push_back(val);
-        }
-
-        return result;
-    }
-
-    void Headers::add(string name, string value) {
-        fields.emplace_back(std::move(name), std::move(value));
-    }
-
-    void Headers::remove(string_view name) {
-        erase_if(fields, [name](const pair<string, string>& p) {
-            return case_insensitive_equals(name, p.first);
-        });
-    }
-
     static optional<Method> parse_method(string_view s) {
         // Methods are case-sensitive (RFC 9110 §9.1), so "get" is not GET.
         if (s == "GET") return Method::Get;
@@ -93,34 +55,10 @@ namespace http {
         return nullopt;
     }
 
-    // OWS = *( SP / HTAB ) (RFC 9110 §5.6.3)
-    constexpr string_view ows = " \t";
-
     // tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
     //         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA (RFC 9110 §5.6.2)
     static bool is_tchar(char c) {
         return isalnum(static_cast<unsigned char>(c)) || "!#$%&'*+-.^_`|~"sv.contains(c);
-    }
-
-    static string_view trim(string_view s) {
-        size_t first = s.find_first_not_of(ows);
-        if (first == string_view::npos) {
-            return "";
-        }
-
-        size_t last = s.find_last_not_of(ows);
-        return s.substr(first, last - first + 1);
-    }
-
-    // Splits `s` at the first `delim` into the parts before and after it, or
-    // returns nullopt if `delim` isn't in `s`.
-    static optional<pair<string_view, string_view>> split_once(string_view s, char delim) {
-        size_t pos = s.find(delim);
-        if (pos == string_view::npos) {
-            return nullopt;
-        }
-
-        return pair{s.substr(0, pos), s.substr(pos + 1)};
     }
 
     // `lines` is the header section without the empty line that ends it, so
@@ -158,21 +96,6 @@ namespace http {
         }
 
         return headers;
-    }
-
-    // Parses all of `s` as a number in `base`, or returns nullopt if `s` is
-    // empty, has a character that isn't a digit, or doesn't fit in `T`.
-    template <typename T>
-    static optional<T> parse_number(string_view s, int base = 10) {
-        T result{};
-        const char* end = s.data() + s.size();
-        auto [ptr, ec] = from_chars(s.data(), end, result, base);
-
-        if (ec != errc{} || ptr != end) {
-            return nullopt;
-        }
-
-        return result;
     }
 
     expected<string, ParseError> decode_percent(string_view s) {

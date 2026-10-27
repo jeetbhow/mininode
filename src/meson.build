@@ -1,5 +1,7 @@
 lib_sources = files(
-    'http.cpp'
+    'headers.cpp',
+    'http.cpp',
+    'utils.cpp',
 )
 
 http_lib = static_library(
