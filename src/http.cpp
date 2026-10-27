@@ -109,9 +109,7 @@ namespace http {
     }
 
     // OWS = *( SP / HTAB ) (RFC 9110 §5.6.3)
-    static bool is_ows(char c) {
-        return c == ' ' || c == '\t';
-    }
+    constexpr string_view ows = " \t";
 
     // tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
     //         "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA (RFC 9110 §5.6.2)
@@ -119,34 +117,14 @@ namespace http {
         return isalnum(static_cast<unsigned char>(c)) || "!#$%&'*+-.^_`|~"sv.contains(c);
     }
 
-    static string_view ltrim(string_view s) {
-        auto it = ranges::find_if(s, [](char c) {
-            return !is_ows(c);
-        });
-
-        if (it == s.end()) {
-            return "";
-        }
-
-        return s.substr(it - s.begin());
-    }
-
-    static string_view rtrim(string_view s) {
-        auto reversed = s | views::reverse; 
-
-        auto it = ranges::find_if(reversed, [](char c) {
-            return !is_ows(c);
-        });
-
-        if (it == reversed.end()) {
-            return "";
-        }
-
-        return s.substr(0, s.size() - (it - reversed.begin()));
-    }
-
     static string_view trim(string_view s) {
-        return ltrim(rtrim(s));
+        size_t first = s.find_first_not_of(ows);
+        if (first == string_view::npos) {
+            return "";
+        }
+
+        size_t last = s.find_last_not_of(ows);
+        return s.substr(first, last - first + 1);
     }
 
     // `lines` is the header section without the empty line that ends it, so
