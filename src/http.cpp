@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
-#include <cstdio>
 #include <expected>
 #include <ranges>
 
@@ -62,7 +61,7 @@ namespace http {
     }
 
     void Headers::add(string name, string value) {
-        fields.emplace_back(name, value);
+        fields.emplace_back(std::move(name), std::move(value));
     }
 
     void Headers::remove(string_view name) {
@@ -191,7 +190,7 @@ namespace http {
     }
 
     expected<string, ParseError> decode_percent(string_view s) {
-        string result = "";
+        string result;
         size_t i = 0;
         while (i < s.size()) {
             if (s[i] != '%') {
@@ -262,10 +261,10 @@ namespace http {
             return unexpected(ParseError::BadRequest);
         }
 
-        string_view request_line_sv = request.substr(0, request_line_end);
+        string_view request_line = request.substr(0, request_line_end);
 
         vector<string_view> parts;
-        for (auto part : request_line_sv | views::split(' ')) {
+        for (auto part : request_line | views::split(' ')) {
             parts.emplace_back(part.begin(), part.end());
         }
 
@@ -295,21 +294,21 @@ namespace http {
         }
 
         // A target without a '?' is all path and has an empty query.
-        string_view path_sv = target;
-        string_view query_sv;
+        string_view path = target;
+        string_view query;
         if (optional<pair<string_view, string_view>> split = split_once(target, '?')) {
-            path_sv = split->first;
-            query_sv = split->second;
+            path = split->first;
+            query = split->second;
         }
 
-        expected<unordered_map<string, string>, ParseError> query_params = parse_query_params(query_sv);
+        expected<unordered_map<string, string>, ParseError> query_params = parse_query_params(query);
         if (!query_params) {
             return unexpected(query_params.error());
         }
 
         Request r{};
         r.method = *method;
-        r.path = path_sv;
+        r.path = path;
         r.version = *version;
         r.query_params = *query_params;
 
@@ -329,12 +328,12 @@ namespace http {
 
         r.headers = std::move(*headers);
 
-        optional<string> result = r.headers.get("Content-Length");
-        if (!result) {
+        optional<string> content_length_header = r.headers.get("Content-Length");
+        if (!content_length_header) {
             return r;
         }
 
-        optional<size_t> content_length = parse_number<size_t>(*result);
+        optional<size_t> content_length = parse_number<size_t>(*content_length_header);
         if (!content_length) {
             return unexpected(ParseError::BadRequest);
         }
