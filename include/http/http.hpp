@@ -1,11 +1,3 @@
-/**
- * @file http.hpp
- * @author jeetbhowm (jeetbhowm@domain.com)
- * @brief Helpful functions and definitions for reading/writing HTTP requests and responses.
- * @version 0.1
- * @date 2026-10-24
- */
-
 #pragma once
 
 #include "headers.hpp"
