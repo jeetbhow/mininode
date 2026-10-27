@@ -2,9 +2,12 @@
 
 #include <charconv>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace http {
     /**
@@ -55,6 +58,56 @@ namespace http {
      *         `std::nullopt` if `s` doesn't contain `delim`.
      */
     std::optional<std::pair<std::string_view, std::string_view>> split_once(std::string_view s, char delim);
+
+    /**
+     * @brief Writes a string as a JSON string literal, including the quotes.
+     *
+     * Escapes `"`, `\` and control characters (RFC 8259 §7). Other bytes,
+     * including non-ASCII ones, are copied as they are, so the result is only
+     * valid JSON if `s` is valid UTF-8.
+     *
+     * @param s The string to quote, e.g. `say "hi"`.
+     * @return The literal, e.g. `"say \"hi\""`.
+     */
+    std::string json_quote(std::string_view s);
+
+    /**
+     * @brief Formats a string map as a pretty-printed JSON object, e.g. for
+     *        logs and test output.
+     *
+     * Each entry is on its own line, indented by two spaces:
+     *
+     *     {
+     *       "sort": "asc",
+     *       "page": "2"
+     *     }
+     *
+     * Keys and values are escaped with `json_quote`. The order follows the
+     * map's iteration order, which is unspecified for `std::unordered_map`.
+     *
+     * @param map The map to format.
+     * @return The JSON object, or "{}" if the map is empty.
+     */
+    std::string to_string(const std::unordered_map<std::string, std::string>& map);
+
+    /**
+     * @brief Formats a list of name/value pairs as a pretty-printed JSON array
+     *        of `[name, value]` arrays, e.g. for logs and test output.
+     *
+     * Each pair is on its own line, indented by two spaces:
+     *
+     *     [
+     *       ["Host", "example.com"],
+     *       ["Accept", "text/html"]
+     *     ]
+     *
+     * Names and values are escaped with `json_quote`. Unlike a map, a list
+     * keeps the pairs' order and any duplicate names, e.g. header fields.
+     *
+     * @param pairs The pairs to format.
+     * @return The JSON array, or "[]" if the list is empty.
+     */
+    std::string to_string(const std::vector<std::pair<std::string, std::string>>& pairs);
 
     /**
      * @brief Parses an entire string as an integer.

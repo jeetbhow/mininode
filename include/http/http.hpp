@@ -79,6 +79,34 @@ namespace http {
          *         or "?q", gives "".
          */
         std::optional<std::string> query(const std::string& name) const;
+
+        /**
+         * @brief Formats the request as pretty-printed JSON, e.g. for logs and
+         *        test output.
+         *
+         * Not HTTP wire format. Indented by two spaces, e.g.
+         *
+         *     {
+         *       "method": "GET",
+         *       "path": "/users/42",
+         *       "version": "HTTP/1.1",
+         *       "query": {
+         *         "sort": "asc"
+         *       },
+         *       "headers": [
+         *         ["Host", "example.com"]
+         *       ],
+         *       "body": "hello"
+         *     }
+         *
+         * `headers` is an array of `[name, value]` pairs in the order they
+         * appeared, so duplicate fields are kept. Strings are escaped with
+         * `json_quote`, so the output is only valid JSON if the request's
+         * strings are valid UTF-8.
+         *
+         * @return The request as a JSON object.
+         */
+        std::string to_string() const;
     };
 
     /**

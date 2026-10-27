@@ -45,6 +45,34 @@ namespace http {
         return it->second;
     }
 
+    static string_view to_string(Version version) {
+        switch (version) {
+            case Version::Http10: return "HTTP/1.0";
+            case Version::Http11: return "HTTP/1.1";
+        }
+        unreachable();
+    }
+
+    // The member is named to_string, so the free overloads need qualifying.
+    string Request::to_string() const {
+        // The query and headers are nested one level deep, so indent their later lines.
+        auto indent = [](string s) {
+            for (size_t pos = 0; (pos = s.find('\n', pos)) != string::npos; pos += 3) {
+                s.insert(pos + 1, "  ");
+            }
+            return s;
+        };
+
+        string result = "{\n";
+        result += "  \"method\": " + json_quote(http::to_string(method)) + ",\n";
+        result += "  \"path\": " + json_quote(path) + ",\n";
+        result += "  \"version\": " + json_quote(http::to_string(version)) + ",\n";
+        result += "  \"query\": " + indent(http::to_string(query_params)) + ",\n";
+        result += "  \"headers\": " + indent(http::to_string(headers.fields)) + ",\n";
+        result += "  \"body\": " + json_quote(body) + "\n}";
+        return result;
+    }
+
     // HTTP-version = "HTTP/" DIGIT "." DIGIT
     static bool is_http_version(string_view s) {
         auto is_digit = [](char c) { return c >= '0' && c <= '9'; };
