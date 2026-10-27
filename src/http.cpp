@@ -43,6 +43,16 @@ namespace http {
         unreachable();
     }
 
+    optional<string> Request::query(const string& name) const {
+        auto it = query_params.find(name);
+
+        if (it == query_params.end()) {
+            return nullopt;
+        }
+
+        return it->second;
+    }
+
     // HTTP-version = "HTTP/" DIGIT "." DIGIT
     static bool is_http_version(string_view s) {
         auto is_digit = [](char c) { return c >= '0' && c <= '9'; };

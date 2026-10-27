@@ -338,6 +338,100 @@ TEST(QueryParams, DecodesKeysAndValues) {
     EXPECT_EQ(r->query_params["first name"], "a&b");
 }
 
+TEST(QueryParams, RepeatedKeyKeepsLastValue) {
+    string request = "GET /search?q=a&q=b HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query_params.size(), 1);
+    EXPECT_EQ(r->query_params["q"], "b");
+}
+
+TEST(QueryParams, ErrorOnKeyWithoutEquals) {
+    string request = "GET /search?flag HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), ParseError::BadRequest);
+}
+
+TEST(Query, ReturnsValueForPresentKey) {
+    string request = "GET /search?sort=asc&page=2 HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query("sort"), "asc");
+    EXPECT_EQ(r->query("page"), "2");
+}
+
+TEST(Query, NulloptForMissingKey) {
+    string request = "GET /search?sort=asc HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query("page"), nullopt);
+}
+
+TEST(Query, NulloptWithoutQueryString) {
+    string request = "GET /search HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query("sort"), nullopt);
+}
+
+TEST(Query, EmptyStringForEmptyValue) {
+    string request = "GET /search?q= HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query("q"), "");
+}
+
+TEST(Query, NamesAreCaseSensitive) {
+    string request = "GET /search?Sort=asc HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query("sort"), nullopt);
+    EXPECT_EQ(r->query("Sort"), "asc");
+}
+
+TEST(Query, LooksUpDecodedName) {
+    string request = "GET /search?first%20name=Ada HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->query("first name"), "Ada");
+}
+
+TEST(Query, CallableOnConstRequest) {
+    string request = "GET /search?sort=asc HTTP/1.1\r\n"
+                     "\r\n";
+
+    expected<Request, ParseError> r = parse_request(request);
+    ASSERT_TRUE(r.has_value());
+
+    const Request& cr = *r;
+    EXPECT_EQ(cr.query("sort"), "asc");
+}
+
 using PlusCase = tuple<string, string, string>;
 
 class QueryPlusTest : public ::testing::TestWithParam<PlusCase> {};

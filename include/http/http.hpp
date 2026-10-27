@@ -11,6 +11,7 @@
 #include "headers.hpp"
 
 #include <expected>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -72,6 +73,19 @@ namespace http {
 
         /// The request body. Empty if the request has none.
         std::string body;
+
+        /**
+         * @brief Looks up a query parameter by name.
+         *
+         * Names are case-sensitive and compared after percent-decoding. If
+         * the key appears more than once, the last value wins, e.g.
+         * "?q=a&q=b" gives "b".
+         *
+         * @param name The parameter's decoded name, e.g. "sort".
+         * @return The decoded value, or `std::nullopt` if there's no such
+         *         parameter. A key with an empty value, e.g. "?q=", gives "".
+         */
+        std::optional<std::string> query(const std::string& name) const;
     };
 
     /**
