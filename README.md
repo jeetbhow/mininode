@@ -18,3 +18,12 @@ Put source files in `src/` and headers in `include/`. Add new source files to
 add behavior tests as the project grows.
 
 
+## Roadmap
+
+- [ ] Request parsing
+- [ ] Router
+- [ ] Response
+- [ ] Route registration
+- [ ] Middleware
+- [ ] Server
+- [ ] Polish
