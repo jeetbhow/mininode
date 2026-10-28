@@ -10,7 +10,7 @@
 using namespace std;
 
 namespace http {
-    static optional<Method> parse_method(string_view s) {
+    optional<Method> parse_method(string_view s) {
         // Methods are case-sensitive (RFC 9110 §9.1), so "get" is not GET.
         if (s == "GET") return Method::Get;
         if (s == "HEAD") return Method::Head;
