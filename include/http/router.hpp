@@ -1,0 +1,75 @@
+#pragma once
+
+#include "http/http.hpp"
+
+#include <string>
+#include <vector>
+#include <string_view>
+#include <memory>
+#include <optional>
+#include <expected>
+
+/**
+ * GET /hello/:param/world
+ * GET /hello/my/world
+ */
+
+namespace http {
+    enum class RouterError {
+        Ok,
+        InvalidRoute
+    };
+
+    struct Route {
+        std::vector<Method> methods;
+        std::string path;
+
+        // Return true if the route has the method associated with it.
+        bool has_method(Method method);
+    };
+
+    /**
+     * @brief A single node in the router's trie.
+     * 
+     */
+    struct RouteNode {
+        RouteNode() = default;
+        RouteNode(std::string v) : value(v) {};
+
+        std::string value;
+        std::vector<std::unique_ptr<RouteNode>> children{};
+        std::optional<Route> route;
+        
+        // Get a child node.
+        RouteNode* get_child(std::string_view key);
+    };
+
+    /**
+     * @brief Matches targets to routes. 
+     * 
+     */
+    class Router {
+    public:
+        Router() = default;
+
+        // Add a route
+        RouterError add(Method method, std::string_view path);
+
+        // Remove a route if it exists.
+        void remove(std::string_view route);
+
+        // Check if a route exists.
+        std::expected<bool, RouterError> contains(Method method, std::string_view path);
+
+        // Match a target against a route.
+        std::expected<bool, RouterError> match (Method method, std::string_view target);
+
+        // Return the number of routes.
+        size_t size() { return size_; }
+
+    private:
+        /// The root of the trie. All potential routes branch off of this node.
+        RouteNode root_;
+        size_t size_ = 0;
+    };
+}

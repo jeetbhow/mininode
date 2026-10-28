@@ -3,6 +3,7 @@ gtest_dep = dependency('gtest', main: true, fallback: ['gtest', 'gtest_main_dep'
 test_sources = files(
     'http_test.cpp',
     'headers_test.cpp',
+    'router_test.cpp'
 )
 
 unit_tests = executable(
