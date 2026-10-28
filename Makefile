@@ -14,7 +14,7 @@ build: $(BUILD_DIR)/build.ninja
 	meson compile -C $(BUILD_DIR)
 
 test: build
-	meson test -C $(BUILD_DIR) --print-errorlogs
+	meson test -C $(BUILD_DIR) --verbose
 
 run: build
 	./$(BUILD_DIR)/app/app $(ARGS)
