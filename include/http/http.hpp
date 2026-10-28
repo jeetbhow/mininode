@@ -135,4 +135,6 @@ namespace http {
      * @return The parsed request, or the reason it couldn't be parsed.
      */
     std::expected<Request, ParseError> parse_request(std::string_view request);
+
+    std::optional<Method> parse_method(std::string_view s);
 }

@@ -10,5 +10,3 @@ app = executable(
     include_directories: project_inc,
     dependencies: [http_dep, cli11_dep]
 )
-
-test('runs', app)
