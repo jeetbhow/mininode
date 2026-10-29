@@ -146,12 +146,66 @@ TEST_P(RouterMethodPairTest, ContainsReturnsFalseForDifferentMethod) {
 TEST_F(RouterTest, MatchInvalidPathReturnsFalse) {
     router.add(Method::Get, "/a");
 
-    for (const auto path : {"", "a"}) {
+    for (const auto path : {"", "a", "//", "/a/"}) {
         SCOPED_TRACE(path);
         EXPECT_FALSE(router.match(Method::Get, path));
         EXPECT_EQ(router.size(), 1u);
         EXPECT_TRUE(router.contains(Method::Get, "/a"));
     }
+}
+
+TEST_F(RouterTest, MatchRegisteredPathMatches) {
+    router.add(Method::Get, "/a");
+
+    bool result = router.match(Method::Get, "/a");
+    EXPECT_TRUE(result);
+}
+
+TEST_F(RouterTest, MatchRecursivePathMatches) {
+    router.add(Method::Get, "/a/b");
+
+    bool result = router.match(Method::Get, "/a/b");
+    EXPECT_TRUE(result);
+}
+
+TEST_F(RouterTest, MatchRootPathMatches) {
+    router.add(Method::Get, "/");
+
+    bool result = router.match(Method::Get, "/");
+    EXPECT_TRUE(result);
+}
+
+TEST_F(RouterTest, MatchIntermediateNodeWithoutRouteRejects) {
+    router.add(Method::Get, "/a/b");
+
+    bool result = router.match(Method::Get, "/a");
+    EXPECT_FALSE(result);
+}
+
+TEST_F(RouterTest, MatchPathLongerThanRegisteredRejects) {
+    router.add(Method::Get, "/a");
+
+    bool result = router.match(Method::Get, "/a/b");
+    EXPECT_FALSE(result);
+}
+
+TEST_F(RouterTest, MatchUnregisteredPathRejects) {
+    router.add(Method::Get, "/a");
+
+    bool result = router.match(Method::Get, "/b");
+    EXPECT_FALSE(result);
+}
+
+TEST_F(RouterTest, MatchDifferentMethodReject) {
+    router.add(Method::Get, "/a");
+
+    bool result = router.match(Method::Post, "/a");
+    EXPECT_FALSE(result);
+}
+
+TEST_F(RouterTest, MatchEmptyRouterRejects) {
+    bool result = router.match(Method::Get, "/a");
+    EXPECT_FALSE(result);
 }
 
 // Router::remove()

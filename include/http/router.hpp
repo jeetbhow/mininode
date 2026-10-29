@@ -77,6 +77,7 @@ namespace http {
         friend class ::RouterTest;
 
         RouteNode* find(std::string_view path, bool insert = false);
+        RouteNode* match(RouteNode* node, std::string_view target);
 
         /// The root of the trie. All potential routes branch off of this node.
         std::unique_ptr<RouteNode> root_;

@@ -113,9 +113,33 @@ namespace http {
         }
     }
     
-    bool Router::match(Method method, std::string_view target) {
-        // TODO implement
-        return false;
+    bool Router::match(Method method, string_view target) {
+        if (!target.starts_with('/') || target.find("//") != string_view::npos
+            || (target.size() > 1 && target.ends_with('/')) || !root_) {
+            return false;
+        }
+
+        RouteNode* result = match(root_.get(), target.substr(1));
+        return result && result->route && result->route->has_method(method);
+    }
+
+    RouteNode* Router::match(RouteNode* node, string_view target) {
+        if (!node) {
+            return nullptr;
+        }
+
+        if (target.empty()) {
+            return node;
+        }
+
+        size_t pos = target.find('/');
+
+        string_view path_segment = target.substr(0, pos);
+        RouteNode* child = node->get_child(path_segment);
+        string_view remain = pos == string_view::npos ? string_view{} : target.substr(pos + 1);
+
+        RouteNode* result = match(child, remain);
+        return result;
     }
 
 
