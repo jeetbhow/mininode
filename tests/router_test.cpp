@@ -41,99 +41,114 @@ class RouterMethodPairTest : public RouterTest,
 
 // Router::add()
 
-TEST_F(RouterTest, AddAndContainsRejectPathsWithoutLeadingSlash) {
-    EXPECT_EQ(router.add(Method::Get, "a"), RouterError::InvalidRoute);
-    EXPECT_EQ(router.size(), 0u);
+TEST_F(RouterTest, AddInvalidPathIsNoOp) {
+    router.add(Method::Get, "/a");
 
-    auto result = router.contains(Method::Get, "a");
-    ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), RouterError::InvalidRoute);
+    for (const auto path : {"", "a"}) {
+        SCOPED_TRACE(path);
+        router.add(Method::Get, path);
+
+        EXPECT_EQ(router.size(), 1u);
+        EXPECT_TRUE(router.contains(Method::Get, "/a"));
+    }
 }
 
 TEST_P(RouterMethodTest, AddRegistersSingleRoute) {
     const auto method = GetParam();
-    ASSERT_EQ(router.add(method, "/a"), RouterError::Ok);
+    router.add(method, "/a");
 
     EXPECT_EQ(router.size(), 1u);
     auto a = router.contains(method, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_TRUE(*a);
+    EXPECT_TRUE(a);
 }
 
 TEST_F(RouterTest, AddRegistersTwoRoutesWithSameMethod) {
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(Method::Get, "/b"), RouterError::Ok);
+    router.add(Method::Get, "/a");
+    router.add(Method::Get, "/b");
 
     EXPECT_EQ(router.size(), 2u);
 
     auto a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_TRUE(*a);
+    EXPECT_TRUE(a);
 
     auto b = router.contains(Method::Get, "/b");
-    ASSERT_TRUE(b.has_value());
-    EXPECT_TRUE(*b);
+    EXPECT_TRUE(b);
 }
 
 TEST_P(RouterMethodPairTest, AddRegistersTwoRoutesWithDifferentMethods) {
     const auto [first, second] = GetParam();
-    ASSERT_EQ(router.add(first, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(second, "/b"), RouterError::Ok);
+    router.add(first, "/a");
+    router.add(second, "/b");
 
     EXPECT_EQ(router.size(), 2u);
 
     auto first_a = router.contains(first, "/a");
-    ASSERT_TRUE(first_a.has_value());
-    EXPECT_TRUE(*first_a);
+    EXPECT_TRUE(first_a);
 
     auto second_b = router.contains(second, "/b");
-    ASSERT_TRUE(second_b.has_value());
-    EXPECT_TRUE(*second_b);
+    EXPECT_TRUE(second_b);
 
     auto first_b = router.contains(first, "/b");
-    ASSERT_TRUE(first_b.has_value());
-    EXPECT_FALSE(*first_b);
+    EXPECT_FALSE(first_b);
 
     auto second_a = router.contains(second, "/a");
-    ASSERT_TRUE(second_a.has_value());
-    EXPECT_FALSE(*second_a);
+    EXPECT_FALSE(second_a);
 }
 
 // Router::contains()
 
+TEST_F(RouterTest, ContainsInvalidPathReturnsFalse) {
+    router.add(Method::Get, "/a");
+
+    for (const auto path : {"", "a"}) {
+        SCOPED_TRACE(path);
+        EXPECT_FALSE(router.contains(Method::Get, path));
+        EXPECT_EQ(router.size(), 1u);
+        EXPECT_TRUE(router.contains(Method::Get, "/a"));
+    }
+}
+
 TEST_F(RouterTest, ContainsReturnsFalseForUnaddedRoute) {
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
+    router.add(Method::Get, "/a");
 
     auto b = router.contains(Method::Get, "/b");
-    ASSERT_TRUE(b.has_value());
-    EXPECT_FALSE(*b);
+    EXPECT_FALSE(b);
 
     auto a_b = router.contains(Method::Get, "/a/b");
-    ASSERT_TRUE(a_b.has_value());
-    EXPECT_FALSE(*a_b);
+    EXPECT_FALSE(a_b);
 }
 
 TEST_F(RouterTest, ContainsReturnsFalseForIntermediateNode) {
-    ASSERT_EQ(router.add(Method::Get, "/a/b"), RouterError::Ok);
+    router.add(Method::Get, "/a/b");
 
     EXPECT_EQ(router.size(), 1u);
 
     auto a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_FALSE(*a);
+    EXPECT_FALSE(a);
 
     auto a_b = router.contains(Method::Get, "/a/b");
-    ASSERT_TRUE(a_b.has_value());
-    EXPECT_TRUE(*a_b);
+    EXPECT_TRUE(a_b);
 }
 
 TEST_P(RouterMethodPairTest, ContainsReturnsFalseForDifferentMethod) {
     const auto [first, second] = GetParam();
-    ASSERT_EQ(router.add(first, "/a"), RouterError::Ok);
+    router.add(first, "/a");
 
     auto a = router.contains(second, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_FALSE(*a);
+    EXPECT_FALSE(a);
+}
+
+// Router::match()
+
+TEST_F(RouterTest, MatchInvalidPathReturnsFalse) {
+    router.add(Method::Get, "/a");
+
+    for (const auto path : {"", "a"}) {
+        SCOPED_TRACE(path);
+        EXPECT_FALSE(router.match(Method::Get, path));
+        EXPECT_EQ(router.size(), 1u);
+        EXPECT_TRUE(router.contains(Method::Get, "/a"));
+    }
 }
 
 // Router::remove()
@@ -143,12 +158,11 @@ TEST_F(RouterTest, RemoveOnEmptyRouterIsNoOp) {
 
     EXPECT_EQ(router.size(), 0u);
     auto a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_FALSE(*a);
+    EXPECT_FALSE(a);
 }
 
 TEST_F(RouterTest, RemoveInvalidPathIsNoOp) {
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
+    router.add(Method::Get, "/a");
 
     for (const auto path : {"", "a"}) {
         SCOPED_TRACE(path);
@@ -156,13 +170,12 @@ TEST_F(RouterTest, RemoveInvalidPathIsNoOp) {
 
         EXPECT_EQ(router.size(), 1u);
         auto a = router.contains(Method::Get, "/a");
-        ASSERT_TRUE(a.has_value());
-        EXPECT_TRUE(*a);
+        EXPECT_TRUE(a);
     }
 }
 
 TEST_F(RouterTest, RemoveNonExistentPathIsNoOp) {
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
+    router.add(Method::Get, "/a");
 
     for (const auto path : {"/b", "/a/b"}) {
         SCOPED_TRACE(path);
@@ -170,158 +183,136 @@ TEST_F(RouterTest, RemoveNonExistentPathIsNoOp) {
 
         EXPECT_EQ(router.size(), 1u);
         auto a = router.contains(Method::Get, "/a");
-        ASSERT_TRUE(a.has_value());
-        EXPECT_TRUE(*a);
+        EXPECT_TRUE(a);
 
         auto missing = router.contains(Method::Get, path);
-        ASSERT_TRUE(missing.has_value());
-        EXPECT_FALSE(*missing);
+        EXPECT_FALSE(missing);
     }
 }
 
 TEST_P(RouterMethodPairTest, RemoveNonExistentMethodIsNoOp) {
     const auto [first, second] = GetParam();
-    ASSERT_EQ(router.add(first, "/a"), RouterError::Ok);
+    router.add(first, "/a");
 
     router.remove(second, "/a");
     EXPECT_EQ(router.size(), 1u);
 
     auto first_a = router.contains(first, "/a");
-    ASSERT_TRUE(first_a.has_value());
-    EXPECT_TRUE(*first_a);
+    EXPECT_TRUE(first_a);
 
     auto second_a = router.contains(second, "/a");
-    ASSERT_TRUE(second_a.has_value());
-    EXPECT_FALSE(*second_a);
+    EXPECT_FALSE(second_a);
 }
 
 TEST_P(RouterMethodPairTest, RemoveConservesOtherMethods) {
     const auto [first, second] = GetParam();
-    ASSERT_EQ(router.add(first, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(second, "/a"), RouterError::Ok);
+    router.add(first, "/a");
+    router.add(second, "/a");
 
     router.remove(first, "/a");
     EXPECT_EQ(router.size(), 1u);
 
     auto first_a = router.contains(first, "/a");
-    ASSERT_TRUE(first_a.has_value());
-    EXPECT_FALSE(*first_a);
+    EXPECT_FALSE(first_a);
 
     auto second_a = router.contains(second, "/a");
-    ASSERT_TRUE(second_a.has_value());
-    EXPECT_TRUE(*second_a);
+    EXPECT_TRUE(second_a);
 }
 
 TEST_F(RouterTest, RemoveClearsRouteOnEmptyMethods) {
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(Method::Get, "/a/b"), RouterError::Ok);
-    ASSERT_EQ(router.add(Method::Get, "/b"), RouterError::Ok);
+    router.add(Method::Get, "/a");
+    router.add(Method::Get, "/a/b");
+    router.add(Method::Get, "/b");
 
     router.remove(Method::Get, "/a");
 
     EXPECT_EQ(router.size(), 2u);
     auto a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_FALSE(*a);
+    EXPECT_FALSE(a);
 
     auto a_b = router.contains(Method::Get, "/a/b");
-    ASSERT_TRUE(a_b.has_value());
-    EXPECT_TRUE(*a_b);
+    EXPECT_TRUE(a_b);
 
     auto b = router.contains(Method::Get, "/b");
-    ASSERT_TRUE(b.has_value());
-    EXPECT_TRUE(*b);
+    EXPECT_TRUE(b);
 
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
+    router.add(Method::Get, "/a");
     EXPECT_EQ(router.size(), 3u);
     a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_TRUE(*a);
+    EXPECT_TRUE(a);
 }
 
 TEST_F(RouterTest, RemoveConservesInternalNode) {
-    ASSERT_EQ(router.add(Method::Get, "/a/b"), RouterError::Ok);
-    ASSERT_EQ(router.add(Method::Get, "/a/c"), RouterError::Ok);
+    router.add(Method::Get, "/a/b");
+    router.add(Method::Get, "/a/c");
 
     router.remove(Method::Get, "/a");
 
     EXPECT_EQ(router.size(), 2u);
     auto a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_FALSE(*a);
+    EXPECT_FALSE(a);
 
     auto a_b = router.contains(Method::Get, "/a/b");
-    ASSERT_TRUE(a_b.has_value());
-    EXPECT_TRUE(*a_b);
+    EXPECT_TRUE(a_b);
 
     auto a_c = router.contains(Method::Get, "/a/c");
-    ASSERT_TRUE(a_c.has_value());
-    EXPECT_TRUE(*a_c);
+    EXPECT_TRUE(a_c);
 }
 
 TEST_P(RouterMethodPairTest, RemoveDeletesChildNodeIfNoMethods) {
     const auto [first, second] = GetParam();
-    ASSERT_EQ(router.add(first, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(first, "/a/b"), RouterError::Ok);
-    ASSERT_EQ(router.add(second, "/a/b"), RouterError::Ok);
-    ASSERT_EQ(router.add(first, "/a/c"), RouterError::Ok);
+    router.add(first, "/a");
+    router.add(first, "/a/b");
+    router.add(second, "/a/b");
+    router.add(first, "/a/c");
 
     router.remove(first, "/a/b");
     EXPECT_EQ(router.size(), 3u);
     auto first_a_b = router.contains(first, "/a/b");
-    ASSERT_TRUE(first_a_b.has_value());
-    EXPECT_FALSE(*first_a_b);
+    EXPECT_FALSE(first_a_b);
 
     auto second_a_b = router.contains(second, "/a/b");
-    ASSERT_TRUE(second_a_b.has_value());
-    EXPECT_TRUE(*second_a_b);
+    EXPECT_TRUE(second_a_b);
 
     router.remove(second, "/a/b");
     EXPECT_EQ(router.size(), 2u);
     first_a_b = router.contains(first, "/a/b");
-    ASSERT_TRUE(first_a_b.has_value());
-    EXPECT_FALSE(*first_a_b);
+    EXPECT_FALSE(first_a_b);
 
     second_a_b = router.contains(second, "/a/b");
-    ASSERT_TRUE(second_a_b.has_value());
-    EXPECT_FALSE(*second_a_b);
+    EXPECT_FALSE(second_a_b);
 
     auto a = router.contains(first, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_TRUE(*a);
+    EXPECT_TRUE(a);
 
     auto a_c = router.contains(first, "/a/c");
-    ASSERT_TRUE(a_c.has_value());
-    EXPECT_TRUE(*a_c);
+    EXPECT_TRUE(a_c);
 }
 
 // Router::size()
 
 TEST_F(RouterTest, SizeCountsDuplicateRouteOnce) {
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(Method::Get, "/a"), RouterError::Ok);
+    router.add(Method::Get, "/a");
+    router.add(Method::Get, "/a");
 
     EXPECT_EQ(router.size(), 1u);
 
     auto a = router.contains(Method::Get, "/a");
-    ASSERT_TRUE(a.has_value());
-    EXPECT_TRUE(*a);
+    EXPECT_TRUE(a);
 }
 
 TEST_P(RouterMethodPairTest, SizeCountsEachMethodOnSamePath) {
     const auto [first, second] = GetParam();
-    ASSERT_EQ(router.add(first, "/a"), RouterError::Ok);
-    ASSERT_EQ(router.add(second, "/a"), RouterError::Ok);
+    router.add(first, "/a");
+    router.add(second, "/a");
 
     EXPECT_EQ(router.size(), 2u);
 
     auto first_a = router.contains(first, "/a");
-    ASSERT_TRUE(first_a.has_value());
-    EXPECT_TRUE(*first_a);
+    EXPECT_TRUE(first_a);
 
     auto second_a = router.contains(second, "/a");
-    ASSERT_TRUE(second_a.has_value());
-    EXPECT_TRUE(*second_a);
+    EXPECT_TRUE(second_a);
 }
 
 INSTANTIATE_TEST_SUITE_P(

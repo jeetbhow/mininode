@@ -73,16 +73,10 @@ int main(int argc, char** argv) {
         Router router{};
         router.add(*route_method, route_path);
         
-        expected<bool, RouterError> result = router.match(*target_method, target_path);
-        if (result) {
-            if (*result) {
-                cout << "It's a match!\n";   
-            } else {
-                cout << "It's not a match.\n";
-            }
+        if (router.match(*target_method, target_path)) {
+            cout << "It's a match!\n";
         } else {
-            cerr << "router error\n";
-            return 1;
+            cout << "It's not a match.\n";
         }
 
         return 0;

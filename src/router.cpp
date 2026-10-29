@@ -46,9 +46,9 @@ namespace http {
         return it->get();
     }
 
-    RouterError Router::add(Method method, string_view path) {
+    void Router::add(Method method, string_view path) {
         if (!path.starts_with('/')) {
-            return RouterError::InvalidRoute;
+            return;
         }
 
         path = path.substr(1);
@@ -67,7 +67,7 @@ namespace http {
 
         if (curr->route) {
             if (curr->route->has_method(method)) {
-                return RouterError::Ok;
+                return;
             }
             curr->route->methods.push_back(method);
         } else {
@@ -75,12 +75,11 @@ namespace http {
         }
 
         ++size_;
-        return RouterError::Ok;
     }
 
-    expected<bool, RouterError> Router::contains(Method method, string_view path) {
+    bool Router::contains(Method method, string_view path) {
         if (!path.starts_with('/')) {
-            return unexpected(RouterError::InvalidRoute);
+            return false;
         }
 
         path = path.substr(1);
@@ -146,7 +145,7 @@ namespace http {
         }
     }
 
-    expected<bool, RouterError> Router::match(Method method, std::string_view target) {
+    bool Router::match(Method method, std::string_view target) {
         // TODO implement
         return false;
     }

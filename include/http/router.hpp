@@ -7,7 +7,6 @@
 #include <string_view>
 #include <memory>
 #include <optional>
-#include <expected>
 
 /**
  * GET /hello/:param/world
@@ -15,11 +14,6 @@
  */
 
 namespace http {
-    enum class RouterError {
-        Ok,
-        InvalidRoute
-    };
-
     struct Route {
         std::vector<Method> methods;
         std::string path;
@@ -58,17 +52,17 @@ namespace http {
     public:
         Router() = default;
 
-        // Add a route
-        RouterError add(Method method, std::string_view path);
+        // Add a route. Invalid paths are ignored.
+        void add(Method method, std::string_view path);
 
         // Remove a route if it exists. If the path is invalid then reject it.
         void remove(Method method, std::string_view path);
 
-        // Check if a route exists.
-        std::expected<bool, RouterError> contains(Method method, std::string_view path);
+        // Check if a route exists. Invalid paths return false.
+        bool contains(Method method, std::string_view path);
 
-        // Match a target against a route.
-        std::expected<bool, RouterError> match (Method method, std::string_view target);
+        // Match a target against a route. Invalid targets return false.
+        bool match(Method method, std::string_view target);
 
         // Return the number of routes.
         size_t size() { return size_; }
