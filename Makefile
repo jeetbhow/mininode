@@ -17,7 +17,7 @@ test: build
 	meson test -C $(BUILD_DIR) --verbose
 
 run: build
-	./$(BUILD_DIR)/app/app $(ARGS)
+	./$(BUILD_DIR)/app/cli $(ARGS)
 
 # Recreate the build directory, e.g. after moving the project or changing compiler.
 reconfigure:
