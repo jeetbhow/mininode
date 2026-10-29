@@ -47,56 +47,38 @@ namespace http {
     }
 
     void Router::add(Method method, string_view path) {
-        if (!path.starts_with('/')) {
+        // Paths are absolute and have no empty segments ("/a//b", "/a/").
+        if (!path.starts_with('/') || path.find("//") != string_view::npos
+            || (path.size() > 1 && path.ends_with('/'))) {
             return;
         }
 
-        path = path.substr(1);
-
-        RouteNode* curr = &root_;        
-        for (auto part : path | ranges::views::split('/')) {
-            string path_segment = string(part.begin(), part.end());
-            
-            RouteNode* next = curr->get_child(path_segment);
-            if (!next) {
-                next = curr->children.emplace_back(make_unique<RouteNode>(path_segment)).get();
-            }
-
-            curr = next;
+        if (!root_) {
+            root_ = make_unique<RouteNode>("/");
         }
 
-        if (curr->route) {
-            if (curr->route->has_method(method)) {
-                return;
-            }
-            curr->route->methods.push_back(method);
-        } else {
-            curr->route = Route{vector<Method>{ method }, string(path)};
+        RouteNode* node = find(path, true);
+        if (!node->route) {
+            node->route = Route{{}, string(path)};
         }
 
-        ++size_;
+        if (!node->route->has_method(method)) {
+            node->route->methods.push_back(method);
+            size_++;
+        }
     }
 
     bool Router::contains(Method method, string_view path) {
-        if (!path.starts_with('/')) {
+        if (!path.starts_with('/') || path.find("//") != string_view::npos
+            || (path.size() > 1 && path.ends_with('/')) || !root_) {
             return false;
         }
 
-        path = path.substr(1);
-
-        RouteNode* curr = &root_;        
-        for (auto part : path | ranges::views::split('/')) {
-            string_view path_segment(part.begin(), part.end());
-            
-            RouteNode* next = curr->get_child(path_segment);
-            if (!next) {
-                return false;
-            }
-
-            curr = next;
-        }
-
-        return curr->route && curr->route->has_method(method);
+        // find() stops at the last node it reached, so confirm it is the requested path.
+        RouteNode* node = find(path);
+        return node->route
+            && node->route->path == path
+            && node->route->has_method(method);
     }
 
     /**
@@ -109,44 +91,58 @@ namespace http {
      * @param path The path for the route.
      */
     void Router::remove(Method method, std::string_view path) {
-        if (!path.starts_with('/')) {
+        if (!contains(method, path)) {
             return;
         }
 
-        path = path.substr(1);
+        RouteNode* node = find(path);
+        node->route->remove_method(method);
+        size_--;
 
-        RouteNode* curr = &root_;
-        RouteNode* prev = nullptr;
-        for (const auto& subrange : path | views::split('/')) {
-            string_view segment = string_view(subrange.begin(), subrange.end());
-            
-            RouteNode* child = curr->get_child(segment);
-            if (!child) {
-                return;
-            }
-
-            prev = curr;
-            curr = child;
-        }
-
-        if (!curr->route || !curr->route->has_method(method)) {
+        if (!node->route->methods.empty()) {
             return;
         }
+        
+        node->route.reset();
 
-        curr->route->remove_method(method);        
-        --size_;
-
-        if (curr->route->methods.empty()) {
-            curr->route = nullopt;
-        }
-
-        if (!curr->route && curr->children.empty()) {
-            prev->remove_child(curr->value);
+        // Drop the node if nothing hangs off of it anymore.
+        if (node->children.empty() && path != "/") {
+            string_view parent_path = path.substr(0, path.rfind('/'));
+            RouteNode* parent = find(parent_path.empty() ? "/" : parent_path);
+            parent->remove_child(node->value);
         }
     }
-
+    
     bool Router::match(Method method, std::string_view target) {
         // TODO implement
         return false;
+    }
+
+
+    RouteNode* Router::find(string_view path, bool insert) {
+        path = path.substr(1);
+    
+        RouteNode* curr = root_.get();
+
+        for (auto part : path | ranges::views::split('/')) {
+            string_view path_segment(part.begin(), part.end());
+            if (path_segment.empty()) {
+                continue;
+            }
+
+            RouteNode* next = curr->get_child(path_segment);
+            if (!next) {
+                if (!insert) {
+                    return curr;
+                }
+
+                next = curr->children
+                    .emplace_back(make_unique<RouteNode>(string(path_segment)))
+                    .get();
+            }
+            curr = next;
+        }
+
+        return curr;
     }
 }

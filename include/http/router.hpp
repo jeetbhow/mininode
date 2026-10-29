@@ -31,7 +31,7 @@ namespace http {
      */
     struct RouteNode {
         RouteNode() = default;
-        RouteNode(std::string v) : value(v) {};
+        RouteNode(const std::string& v) : value(v) {};
 
         std::string value;
         std::vector<std::unique_ptr<RouteNode>> children{};
@@ -68,8 +68,10 @@ namespace http {
         size_t size() { return size_; }
 
     private:
+        RouteNode* find(std::string_view path, bool insert = false);
+
         /// The root of the trie. All potential routes branch off of this node.
-        RouteNode root_;
+        std::unique_ptr<RouteNode> root_;
         size_t size_ = 0;
     };
 }
