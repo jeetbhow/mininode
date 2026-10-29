@@ -9,3 +9,6 @@
 
 # Symlink to build/compile_commands.json for clangd
 /compile_commands.json
+
+# Editor settings
+/.vscode/
