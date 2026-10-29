@@ -16,6 +16,9 @@ constexpr std::array methods{
 
 class RouterTest : public testing::Test {
 protected:
+    // Router::find() is private; this fixture is a friend so tests can inspect the trie.
+    RouteNode* find(std::string_view path) { return router.find(path); }
+
     Router router;
 };
 
@@ -282,11 +285,74 @@ TEST_P(RouterMethodPairTest, RemoveDeletesChildNodeIfNoMethods) {
     second_a_b = router.contains(second, "/a/b");
     EXPECT_FALSE(second_a_b);
 
+    // The "b" node is gone, so the lookup stops at its parent.
+    EXPECT_EQ(find("/a/b")->value, "a");
+
     auto a = router.contains(first, "/a");
     EXPECT_TRUE(a);
 
     auto a_c = router.contains(first, "/a/c");
     EXPECT_TRUE(a_c);
+}
+
+TEST_F(RouterTest, RemovePrunesChainOfRoutelessNodes) {
+    router.add(Method::Get, "/a/b/c");
+    router.add(Method::Get, "/d");
+
+    router.remove(Method::Get, "/a/b/c");
+
+    EXPECT_EQ(router.size(), 1u);
+    auto a_b_c = router.contains(Method::Get, "/a/b/c");
+    EXPECT_FALSE(a_b_c);
+
+    auto d = router.contains(Method::Get, "/d");
+    EXPECT_TRUE(d);
+
+    // The whole "a/b/c" chain is gone, so the lookup stops at the root.
+    EXPECT_EQ(find("/a/b/c")->parent, nullptr);
+
+    router.add(Method::Get, "/a/b/c");
+    EXPECT_EQ(router.size(), 2u);
+    a_b_c = router.contains(Method::Get, "/a/b/c");
+    EXPECT_TRUE(a_b_c);
+}
+
+TEST_F(RouterTest, RemovePruningStopsAtAncestorWithRoute) {
+    router.add(Method::Get, "/a");
+    router.add(Method::Get, "/a/b/c");
+
+    router.remove(Method::Get, "/a/b/c");
+
+    EXPECT_EQ(router.size(), 1u);
+    auto a = router.contains(Method::Get, "/a");
+    EXPECT_TRUE(a);
+
+    auto a_b_c = router.contains(Method::Get, "/a/b/c");
+    EXPECT_FALSE(a_b_c);
+
+    // "c" and "b" are pruned, but "a" still holds a route.
+    const RouteNode* node = find("/a/b/c");
+    EXPECT_EQ(node->value, "a");
+    EXPECT_TRUE(node->children.empty());
+}
+
+TEST_F(RouterTest, RemoveLastRouteLeavesRouterUsable) {
+    router.add(Method::Get, "/a/b");
+    router.remove(Method::Get, "/a/b");
+
+    EXPECT_EQ(router.size(), 0u);
+    auto a_b = router.contains(Method::Get, "/a/b");
+    EXPECT_FALSE(a_b);
+
+    // Only the root is left.
+    const RouteNode* root = find("/a/b");
+    EXPECT_EQ(root->parent, nullptr);
+    EXPECT_TRUE(root->children.empty());
+
+    router.add(Method::Get, "/a");
+    EXPECT_EQ(router.size(), 1u);
+    auto a = router.contains(Method::Get, "/a");
+    EXPECT_TRUE(a);
 }
 
 // Router::size()

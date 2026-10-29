@@ -105,11 +105,11 @@ namespace http {
         
         node->route.reset();
 
-        // Drop the node if nothing hangs off of it anymore.
-        if (node->children.empty() && path != "/") {
-            string_view parent_path = path.substr(0, path.rfind('/'));
-            RouteNode* parent = find(parent_path.empty() ? "/" : parent_path);
+        // Prune nodes that no longer lead to a route, walking up towards the root.
+        while (node->parent && !node->route && node->children.empty()) {
+            RouteNode* parent = node->parent;
             parent->remove_child(node->value);
+            node = parent;
         }
     }
     
@@ -137,7 +137,7 @@ namespace http {
                 }
 
                 next = curr->children
-                    .emplace_back(make_unique<RouteNode>(string(path_segment)))
+                    .emplace_back(make_unique<RouteNode>(string(path_segment), curr))
                     .get();
             }
             curr = next;

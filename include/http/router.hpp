@@ -13,6 +13,9 @@
  * GET /hello/my/world
  */
 
+// Test fixture that is allowed to inspect the router's trie.
+class RouterTest;
+
 namespace http {
     struct Route {
         std::vector<Method> methods;
@@ -31,9 +34,12 @@ namespace http {
      */
     struct RouteNode {
         RouteNode() = default;
-        RouteNode(const std::string& v) : value(v) {};
+        RouteNode(const std::string& v, RouteNode* p = nullptr) : value(v), parent(p) {};
 
         std::string value;
+
+        // The node this one hangs off of. Null for the root.
+        RouteNode* parent = nullptr;
         std::vector<std::unique_ptr<RouteNode>> children{};
         std::optional<Route> route;
         
@@ -68,6 +74,8 @@ namespace http {
         size_t size() { return size_; }
 
     private:
+        friend class ::RouterTest;
+
         RouteNode* find(std::string_view path, bool insert = false);
 
         /// The root of the trie. All potential routes branch off of this node.
