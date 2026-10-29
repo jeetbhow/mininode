@@ -26,6 +26,9 @@ namespace http {
 
         // Return true if the route has the method associated with it.
         bool has_method(Method method);
+
+        // Remove a method from the route.
+        void remove_method(Method method);
     };
 
     /**
@@ -42,6 +45,9 @@ namespace http {
         
         // Get a child node.
         RouteNode* get_child(std::string_view key);
+
+        // Remove a child node
+        void remove_child(std::string_view val);
     };
 
     /**
@@ -55,8 +61,8 @@ namespace http {
         // Add a route
         RouterError add(Method method, std::string_view path);
 
-        // Remove a route if it exists.
-        void remove(std::string_view route);
+        // Remove a route if it exists. If the path is invalid then reject it.
+        void remove(Method method, std::string_view path);
 
         // Check if a route exists.
         std::expected<bool, RouterError> contains(Method method, std::string_view path);

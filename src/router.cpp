@@ -17,6 +17,23 @@ namespace http {
         }
     }
 
+    void Route::remove_method(Method method) {
+        auto it = ranges::find(methods, method);
+        if (it != methods.end()) {
+            methods.erase(it);
+        }
+    }
+
+    void RouteNode::remove_child(string_view val) {
+        auto it = ranges::find_if(children, [val](unique_ptr<RouteNode>& node) {
+            return node->value == val;
+        });
+
+        if (it != children.end()) {
+            children.erase(it);
+        }
+    }
+
     RouteNode* RouteNode::get_child(string_view key) {
         auto it = ranges::find_if(children, [key](unique_ptr<RouteNode>& node) {
             return node->value == key;
@@ -83,8 +100,50 @@ namespace http {
         return curr->route && curr->route->has_method(method);
     }
 
-    void Router::remove(std::string_view route) {
-        // TODO: Implement
+    /**
+     * @brief Remove a route from the router.
+     *
+     * If the path contains multiple methods, then only remove the designated one. Otherwise,
+     * remove the entire node from the Trie.
+     * 
+     * @param method The method for the route.
+     * @param path The path for the route.
+     */
+    void Router::remove(Method method, std::string_view path) {
+        if (!path.starts_with('/')) {
+            return;
+        }
+
+        path = path.substr(1);
+
+        RouteNode* curr = &root_;
+        RouteNode* prev = nullptr;
+        for (const auto& subrange : path | views::split('/')) {
+            string_view segment = string_view(subrange.begin(), subrange.end());
+            
+            RouteNode* child = curr->get_child(segment);
+            if (!child) {
+                return;
+            }
+
+            prev = curr;
+            curr = child;
+        }
+
+        if (!curr->route || !curr->route->has_method(method)) {
+            return;
+        }
+
+        curr->route->remove_method(method);        
+        --size_;
+
+        if (curr->route->methods.empty()) {
+            curr->route = nullopt;
+        }
+
+        if (!curr->route && curr->children.empty()) {
+            prev->remove_child(curr->value);
+        }
     }
 
     expected<bool, RouterError> Router::match(Method method, std::string_view target) {
